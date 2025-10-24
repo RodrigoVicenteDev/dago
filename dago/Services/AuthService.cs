@@ -1,10 +1,11 @@
-﻿using dago.Models;
-using dago.Models.DTOs;
-using dago.Repository;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using dago.Models;
+using dago.Models.DTOs;
+using dago.Repository;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 
 namespace dago.Services
 {
@@ -21,26 +22,48 @@ namespace dago.Services
             _config = config;
         }
 
-        public async Task<string> LoginAsync(LoginDTO dto)
+        public async Task<LoginResponstaDTO> LoginAsync(LoginDTO dto)
         {
-            var usuario = await _repo.ObterPorEmailAsync(dto.Email);
+            var usuario = await _repo.ObterPorEmailComRelacionamentosAsync(dto.Email);
             if (usuario == null)
                 throw new Exception("Usuário não encontrado.");
 
             if (!_hash.Verificar(dto.Senha, usuario.Senha))
                 throw new Exception("Senha incorreta.");
 
-            // gerar token JWT
-            return GerarToken(usuario);
+            var token = GerarToken(usuario);
+
+            // monta o DTO de resposta
+            var resp = new LoginResponstaDTO
+            {
+                Token = token,
+                Usuario = new LoginResponstaDTO.UsuarioResumo
+                {
+                    Id = usuario.Id,
+                    Nome = usuario.Nome,
+                    Email = usuario.Email,
+                    Cargo = usuario.Cargo?.Nome,
+                    Clientes = usuario.Clientes.Select(c => new LoginResponstaDTO.ClienteResumo
+                    {
+                        Id = c.Id,
+                        Nome = c.Nome,
+                        Cnpj = c.Cnpj
+                    }).ToList()
+                }
+            };
+
+            return resp;
         }
 
         private string GerarToken(Usuario usuario)
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
             {
+                // facilita ler o Id depois via ClaimTypes.NameIdentifier
+                new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Sub, usuario.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, usuario.Email),
                 new Claim("nome", usuario.Nome),

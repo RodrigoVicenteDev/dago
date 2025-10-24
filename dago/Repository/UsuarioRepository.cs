@@ -18,6 +18,13 @@ namespace dago.Repository
             return await _context.Usuarios.FirstOrDefaultAsync(u => u.Email == email);
         }
 
+        public async Task<Usuario?> ObterPorEmailComRelacionamentosAsync(string email)
+        {
+            return await _context.Usuarios
+                .Include(u => u.Cargo)
+                .Include(u => u.Clientes)
+                .FirstOrDefaultAsync(u => u.Email == email);
+        }
         public async Task<Usuario> CriarAsync(Usuario usuario)
         {
             _context.Usuarios.Add(usuario);
