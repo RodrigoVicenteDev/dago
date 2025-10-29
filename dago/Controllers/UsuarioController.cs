@@ -1,6 +1,7 @@
 ﻿using dago.Models;
 using dago.Models.DTOs;
 using dago.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace dago.Controllers
@@ -15,7 +16,7 @@ namespace dago.Controllers
         {
             _service = service;
         }
-
+        [Authorize]
         [HttpPost("cadastrar")]
         public async Task<IActionResult> Cadastrar([FromBody] CadastrarUsuarioDTO dto)
         {
@@ -57,7 +58,7 @@ namespace dago.Controllers
             
 
         }
-
+        [Authorize]
         [HttpPatch("atualizar/{id}")]
         public async Task<IActionResult> Atualizar(int id, [FromBody] AtualizarUsuarioDTO dto)
         {
@@ -82,7 +83,7 @@ namespace dago.Controllers
                return BadRequest(new {erro = ex.Message});
             }
         }
-
+        [Authorize]
         [HttpDelete("deletar/{id}")]
         public async Task<IActionResult> Deletar(int id)
         {
@@ -97,14 +98,14 @@ namespace dago.Controllers
                 return BadRequest(new {erro = ex.Message});
             }
         }
-
+        [Authorize]
         [HttpGet("listartodos")]
         public async Task<IActionResult> Listar()
         {
             var usuarios = await _service.ListarUsuariosAsync();
             return Ok(usuarios);
         }
-
+        [Authorize]
         [HttpGet("busca/{id}")]
         public async Task<IActionResult> ObterPorId(int id)
         {
@@ -118,7 +119,7 @@ namespace dago.Controllers
                 return NotFound(new { erro = ex.Message });
             }
         }
-
+        [Authorize]
         [HttpPatch("alterarsenha/{id}")]
         public async Task<IActionResult> AlterarSenha(int id, [FromBody] AlterarSenhaDTO dto)
         {

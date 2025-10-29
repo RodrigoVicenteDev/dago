@@ -1,5 +1,6 @@
 ﻿using dago.Data;
 using dago.Models;
+using dago.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
 
 namespace dago.Repository
@@ -41,10 +42,21 @@ namespace dago.Repository
             await _context.SaveChangesAsync();
         }
 
-        public async Task<List<Cargo>> ObterTodosAsync()
+        public async Task<List<ClienteDTO>> ObterTodosAsync()
         {
-            return await _context.Cargos
-                .Include(c => c.Usuarios) // opcional: traz os usuários que têm esse cargo
+            return await _context.Clientes
+                .Include(c => c.Usuario)
+                .Select(c => new ClienteDTO
+                {
+                    Id = c.Id,
+                    Nome = c.Nome,
+                    Cnpj = c.Cnpj,
+                    Usuario = c.Usuario == null ? null : new UsuarioResumoDTO
+                    {
+                        Id = c.Usuario.Id,
+                        Nome = c.Usuario.Nome
+                    }
+                })
                 .ToListAsync();
         }
 

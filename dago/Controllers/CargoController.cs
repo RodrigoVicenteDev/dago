@@ -1,6 +1,7 @@
 ﻿using dago.Models;
 using dago.Models.DTOs;
 using dago.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace dago.Controllers
@@ -15,7 +16,7 @@ namespace dago.Controllers
         {
             _service = service;
         }
-
+        [Authorize]
         [HttpPost("cadastrar")]
         public async Task<IActionResult> Cadastrar([FromBody] CadastrarCargoDTO dto)
         {
@@ -42,14 +43,14 @@ namespace dago.Controllers
                 return BadRequest(new { erro = ex.Message });
             }
         }
-
+        [Authorize]
         [HttpGet("listar")]
         public async Task<IActionResult> Listar()
         {
             var cargos = await _service.ListarCargosAsync();
             return Ok(cargos);
         }
-
+        [Authorize]
         [HttpDelete("deletar/{id}")]
         public async Task<IActionResult> Delete(int id)
 
@@ -68,7 +69,7 @@ namespace dago.Controllers
         }
 
 
-
+        [Authorize]
         [HttpGet("{id}")]
         public async Task<IActionResult> ObterPorId(int id)
         {

@@ -1,4 +1,5 @@
 ﻿using dago.Models;
+using dago.Models.DTOs;
 using dago.Repository;
 
 namespace dago.Services
@@ -24,7 +25,7 @@ namespace dago.Services
 
         public async Task DeletarClienteAsync(int id)
         {
-            var cliente = await _repo.ObterPorIdjAsync(id);
+            var cliente = await _repo.ObterPorIdAsync(id);
 
             if (cliente == null)
                 throw new Exception("Cliente não encontrado.");
@@ -32,14 +33,14 @@ namespace dago.Services
             await _repo.Deletar(cliente);
         }
 
-        public async Task<List<Cliente>> ListarClientesAsync()
+        public async Task<List<ClienteDTO>> ListarClientesAsync()
         {
             return await _repo.ObterTodosAsync();
         }
 
-        public async Task<Cliente> ObterClientePorIdAsync(int id)
+        public async Task<ClienteDTO> ObterClientePorIdAsync(int id)
         {
-            var cliente = await _repo.ObterPorIdjAsync(id);
+            var cliente = await _repo.ObterPorIdAsyncDTO(id);
             if (cliente == null)
                 throw new Exception("Cliente não encontrado.");
             return cliente;
