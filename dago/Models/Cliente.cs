@@ -15,7 +15,7 @@ namespace dago.Models
         [ForeignKey(nameof(Usuario))]
         public int? UsuarioId { get; set; }
 
-       
-        public Usuario? Usuario { get; set; } 
+       public Usuario? Usuario { get; set; }
+        public ICollection<Ctrc> Ctrcs { get; set; } = new List<Ctrc>();
     }
 }

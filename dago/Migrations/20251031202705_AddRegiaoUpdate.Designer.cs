@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using dago.Data;
@@ -11,9 +12,11 @@ using dago.Data;
 namespace dago.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251031202705_AddRegiaoUpdate")]
+    partial class AddRegiaoUpdate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -232,17 +235,12 @@ namespace dago.Migrations
                     b.Property<int>("DiasLead")
                         .HasColumnType("integer");
 
-                    b.Property<int>("RegiaoEstadoId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("TipoRegiaoId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ClienteId");
-
-                    b.HasIndex("RegiaoEstadoId");
 
                     b.HasIndex("TipoRegiaoId");
 
@@ -596,12 +594,6 @@ namespace dago.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("dago.Models.RegiaoEstado", "RegiaoEstado")
-                        .WithMany()
-                        .HasForeignKey("RegiaoEstadoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("dago.Models.TipoRegiao", "TipoRegiao")
                         .WithMany()
                         .HasForeignKey("TipoRegiaoId")
@@ -609,8 +601,6 @@ namespace dago.Migrations
                         .IsRequired();
 
                     b.Navigation("Cliente");
-
-                    b.Navigation("RegiaoEstado");
 
                     b.Navigation("TipoRegiao");
                 });

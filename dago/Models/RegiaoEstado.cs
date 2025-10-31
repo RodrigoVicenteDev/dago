@@ -2,7 +2,7 @@
 
 namespace dago.Models
 {
-    public class StatusEntrega
+    public class RegiaoEstado
     {
         [Key]
         public int Id { get; set; }
@@ -10,9 +10,9 @@ namespace dago.Models
         [Required, MaxLength(50)]
         public string Nome { get; set; } = string.Empty;
 
-        
-        // Relacionamento 1:N → CTRCs
-        public ICollection<Ctrc> Ctrcs { get; set; } = new List<Ctrc>();
+        [Required, MaxLength(10)]
+        public string Sigla { get; set; } = string.Empty;
+
+        public ICollection<Estado> Estados { get; set; } = new List<Estado>();
     }
 }
-

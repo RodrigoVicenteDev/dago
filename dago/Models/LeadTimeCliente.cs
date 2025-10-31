@@ -19,6 +19,9 @@ namespace dago.Models
         public int TipoRegiaoId { get; set; }
 
         public TipoRegiao TipoRegiao { get; set; } = null!;
+        [ForeignKey(nameof(RegiaoEstado))]
+        public int RegiaoEstadoId { get; set; }
+        public RegiaoEstado RegiaoEstado { get; set; } = null!;
 
         [Required]
         public int DiasLead { get; set; }

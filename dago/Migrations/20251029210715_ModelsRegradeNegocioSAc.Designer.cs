@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using dago.Data;
@@ -11,9 +12,11 @@ using dago.Data;
 namespace dago.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251029210715_ModelsRegradeNegocioSAc")]
+    partial class ModelsRegradeNegocioSAc
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -136,14 +139,6 @@ namespace dago.Migrations
                     b.Property<DateTime>("DataEmissao")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Destinatario")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
-
-                    b.Property<int?>("DesvioPrazoDias")
-                        .HasColumnType("integer");
-
                     b.Property<int>("EstadoDestinoId")
                         .HasColumnType("integer");
 
@@ -159,17 +154,7 @@ namespace dago.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
-                    b.Property<string>("Observacao")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<decimal>("Peso")
-                        .HasColumnType("decimal(10,4)");
-
                     b.Property<int>("StatusEntregaId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("UnidadeId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
@@ -181,8 +166,6 @@ namespace dago.Migrations
                     b.HasIndex("EstadoDestinoId");
 
                     b.HasIndex("StatusEntregaId");
-
-                    b.HasIndex("UnidadeId");
 
                     b.ToTable("Ctrcs");
                 });
@@ -203,17 +186,12 @@ namespace dago.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<int>("RegiaoEstadoId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Sigla")
                         .IsRequired()
                         .HasMaxLength(2)
                         .HasColumnType("character varying(2)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("RegiaoEstadoId");
 
                     b.ToTable("Estados");
                 });
@@ -232,17 +210,12 @@ namespace dago.Migrations
                     b.Property<int>("DiasLead")
                         .HasColumnType("integer");
 
-                    b.Property<int>("RegiaoEstadoId")
-                        .HasColumnType("integer");
-
                     b.Property<int>("TipoRegiaoId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ClienteId");
-
-                    b.HasIndex("RegiaoEstadoId");
 
                     b.HasIndex("TipoRegiaoId");
 
@@ -339,29 +312,6 @@ namespace dago.Migrations
                     b.ToTable("ParticularidadesCliente");
                 });
 
-            modelBuilder.Entity("dago.Models.RegiaoEstado", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Nome")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("Sigla")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("RegioesEstados");
-                });
-
             modelBuilder.Entity("dago.Models.StatusEntrega", b =>
                 {
                     b.Property<int>("Id")
@@ -432,29 +382,6 @@ namespace dago.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("TiposRegiao");
-                });
-
-            modelBuilder.Entity("dago.Models.Unidade", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("EstadoId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Nome")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("character varying(120)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EstadoId");
-
-                    b.ToTable("Unidades");
                 });
 
             modelBuilder.Entity("dago.Models.Usuario", b =>
@@ -560,12 +487,6 @@ namespace dago.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("dago.Models.Unidade", "Unidade")
-                        .WithMany("Ctrcs")
-                        .HasForeignKey("UnidadeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("CidadeDestino");
 
                     b.Navigation("Cliente");
@@ -573,19 +494,6 @@ namespace dago.Migrations
                     b.Navigation("EstadoDestino");
 
                     b.Navigation("StatusEntrega");
-
-                    b.Navigation("Unidade");
-                });
-
-            modelBuilder.Entity("dago.Models.Estado", b =>
-                {
-                    b.HasOne("dago.Models.RegiaoEstado", "RegiaoEstado")
-                        .WithMany("Estados")
-                        .HasForeignKey("RegiaoEstadoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("RegiaoEstado");
                 });
 
             modelBuilder.Entity("dago.Models.LeadTimeCliente", b =>
@@ -596,12 +504,6 @@ namespace dago.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("dago.Models.RegiaoEstado", "RegiaoEstado")
-                        .WithMany()
-                        .HasForeignKey("RegiaoEstadoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("dago.Models.TipoRegiao", "TipoRegiao")
                         .WithMany()
                         .HasForeignKey("TipoRegiaoId")
@@ -609,8 +511,6 @@ namespace dago.Migrations
                         .IsRequired();
 
                     b.Navigation("Cliente");
-
-                    b.Navigation("RegiaoEstado");
 
                     b.Navigation("TipoRegiao");
                 });
@@ -656,17 +556,6 @@ namespace dago.Migrations
                     b.Navigation("Ctrc");
                 });
 
-            modelBuilder.Entity("dago.Models.Unidade", b =>
-                {
-                    b.HasOne("dago.Models.Estado", "Estado")
-                        .WithMany("Unidades")
-                        .HasForeignKey("EstadoId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Estado");
-                });
-
             modelBuilder.Entity("dago.Models.Usuario", b =>
                 {
                     b.HasOne("dago.Models.Cargo", "Cargo")
@@ -709,13 +598,6 @@ namespace dago.Migrations
                     b.Navigation("Cidades");
 
                     b.Navigation("Ctrcs");
-
-                    b.Navigation("Unidades");
-                });
-
-            modelBuilder.Entity("dago.Models.RegiaoEstado", b =>
-                {
-                    b.Navigation("Estados");
                 });
 
             modelBuilder.Entity("dago.Models.StatusEntrega", b =>
@@ -736,11 +618,6 @@ namespace dago.Migrations
             modelBuilder.Entity("dago.Models.TipoRegiao", b =>
                 {
                     b.Navigation("Cidades");
-                });
-
-            modelBuilder.Entity("dago.Models.Unidade", b =>
-                {
-                    b.Navigation("Ctrcs");
                 });
 
             modelBuilder.Entity("dago.Models.Usuario", b =>
