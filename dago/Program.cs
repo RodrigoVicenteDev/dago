@@ -52,6 +52,9 @@ builder.Services.AddScoped<CargoService>();
 builder.Services.AddScoped<UsuarioRepository>();
 builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<ICtrcRepository, CtrcRepository>();
+builder.Services.AddScoped<ICtrcImportService, CtrcImportService>();
 
 
 
