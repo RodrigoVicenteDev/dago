@@ -21,8 +21,8 @@ namespace dago.Models
             [ForeignKey(nameof(Cliente))]
             public int ClienteId { get; set; }
             public Cliente Cliente { get; set; } = null!;
-        [Required, MaxLength(255)]
-        public string Destinatario { get; set; } = string.Empty;
+             [Required, MaxLength(255)]
+             public string Destinatario { get; set; } = string.Empty;
     
              [ForeignKey(nameof(CidadeDestino))]
             public int CidadeDestinoId { get; set; }
@@ -40,15 +40,17 @@ namespace dago.Models
             public int LeadTimeDias { get; set; }
         [Required,Column(TypeName = "decimal(10,4)")]
         public decimal Peso { get; set; }
-
+        public DateTime? DataEntregaRealizada { get; set; }
         public int? DesvioPrazoDias { get; set; }
 
              [MaxLength(500)]
              public string? Observacao { get; set; }
+            public string? NotasFiscais { get; set; } 
 
             [ForeignKey(nameof(Unidade))]
             public int UnidadeId { get; set; }
             public Unidade Unidade { get; set; } = null!;
+        public DateTime? DataPrevistaEntrega { get; set; }
         public ParticularidadeCliente? ParticularidadeCliente { get; set; }
         // Relacionamentos 1:N
              public ICollection<Agenda> Agendas { get; set; } = new List<Agenda>();

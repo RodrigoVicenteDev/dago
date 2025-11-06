@@ -4,8 +4,9 @@ using dago.Data;
 using dago.Models;
 using dago.Models.DTOs;
 using dago.Repository;
-using Microsoft.Extensions.Caching.Memory;
+using dago.Services.Utils;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using System.Globalization;
 
 namespace dago.Services
@@ -110,59 +111,269 @@ namespace dago.Services
         // === 2️⃣ Confirmação e gravação ===
         public async Task<(int inseridos, List<LinhaErroImportacaoDTO> erros)> ConfirmAsync(string token)
         {
-            if (!_cache.TryGetValue(token, out (List<object> preview, List<(int Linha, string Motivo)> errosCache) data))
+            List<object> linhas;
+            List<LinhaErroImportacaoDTO> errosPendentes = new();
+
+            if (_cache.TryGetValue(token, out ImportCacheData dataNovo))
+            {
+                linhas = dataNovo.LinhasValidas ?? new List<object>();
+            }
+            else if (_cache.TryGetValue(token, out (List<object> preview, List<(int Linha, string Motivo)> errosCache) dataAntigo))
+            {
+                linhas = dataAntigo.preview ?? new List<object>();
+                errosPendentes = dataAntigo.errosCache
+                    .Select(e => new LinhaErroImportacaoDTO { Linha = e.Linha, Erro = e.Motivo, Severidade = "Alerta" })
+                    .ToList();
+            }
+            else
+            {
                 throw new InvalidOperationException("Pré-visualização expirada ou inexistente.");
+            }
 
             var erros = new List<LinhaErroImportacaoDTO>();
-            int inseridos = 0;
+            int gravados = 0;
+            int linhaNum = 0;
 
-            // 🔹 Recupera dados básicos do banco
-            var estados = await _db.Estados.AsNoTracking().ToListAsync();
-            var clientes = await _db.Clientes.AsNoTracking().ToListAsync();
-            var cidades = await _db.Cidades.AsNoTracking().ToListAsync();
-            var unidades = await _db.Unidades.AsNoTracking().ToListAsync();
-
-            int linha = 0;
-            foreach (dynamic item in data.preview)
+            foreach (dynamic item in linhas)
             {
-                linha++;
+                linhaNum++;
                 try
                 {
+                    var normalizer = new CtrcNormalizer(_db);
                     string numeroCtrc = item.ctrc ?? "";
+                    if (string.IsNullOrWhiteSpace(numeroCtrc))
+                        throw new Exception("CTRC sem número.");
 
-                    if (await _repo.CtrcExisteAsync(numeroCtrc))
-                        throw new Exception($"CTRC '{numeroCtrc}' já existente.");
+                    var (cliente, cidade, estado, unidade) = await normalizer.ResolverAsync(
+                        (string)item.clienteRemetente,
+                        (string)item.clienteDestinatario,
+                        (string)item.cidadeEntrega,
+                        (string)item.ufEntrega,
+                        (string)item.unidadeReceptora
+                    );
 
-                    var ctrc = new Ctrc
+                    DateTime? dataEmissao = ParseDate(item.dataEmissao);
+                    DateTime? dataEntrega = ParseDate(item.dataEntregaRealizada);
+                    DateTime? dataOcorrencia = ParseDate(item.dataUltimaOcorrencia);
+
+                    decimal pesoTon = 0;
+                    try { pesoTon = (decimal)(item.pesoToneladas ?? 0m); }
+                    catch
                     {
-                        Numero = numeroCtrc,
-                        DataEmissao = ParseDate(item.dataEmissao),
-                        NumeroNotaFiscal = item.numeroNotaFiscal,
-                        Observacao = item.descricaoUltimaOcorrencia ?? "",
-                        Peso = (decimal)(item.pesoToneladas ?? 0)
-                    };
+                        if (decimal.TryParse(((string?)item.pesoToneladas) ?? "0", NumberStyles.Any, new CultureInfo("pt-BR"), out var p))
+                            pesoTon = p;
+                    }
 
-                    await _repo.AddCtrcAsync(ctrc);
-                    inseridos++;
+                    int leadTimeDias = await CalcularLeadTimeDiasAsync(cliente.Id, cidade.Id);
+
+                    DateTime? dataPrevistaEntrega = null;
+                    if (dataEmissao.HasValue && leadTimeDias > 0)
+                    {
+                        dataPrevistaEntrega = dataEmissao.Value.AddDays(leadTimeDias);
+                    }
+
+
+                    var ctrc = await _db.Ctrcs.FirstOrDefaultAsync(c => c.Numero == numeroCtrc);
+
+                    if (ctrc == null)
+                    {
+                        ctrc = new Ctrc
+                        {
+                            Numero = numeroCtrc,
+                            DataEmissao = dataEmissao ?? DateTime.Now,
+                            NumeroNotaFiscal = item.numeroNotaFiscal,
+                            ClienteId = cliente.Id,
+                            CidadeDestinoId = cidade.Id,
+                            EstadoDestinoId = estado.Id,
+                            UnidadeId = unidade.Id,
+                            Observacao = null,
+                            Peso = pesoTon,
+                            LeadTimeDias = leadTimeDias,
+                            DataPrevistaEntrega = dataPrevistaEntrega,
+                            DataEntregaRealizada = dataEntrega,
+                            NotasFiscais = item.notasFiscais,
+                            Destinatario = (string)item.clienteDestinatario
+                        };
+                        AplicarStatusEDesvio(ctrc, dataEntrega);
+                        _db.Ctrcs.Add(ctrc);
+                    }
+                    else
+                    {
+                        ctrc.NumeroNotaFiscal = item.numeroNotaFiscal;
+                        ctrc.ClienteId = cliente.Id;
+                        ctrc.CidadeDestinoId = cidade.Id;
+                        ctrc.EstadoDestinoId = estado.Id;
+                        ctrc.UnidadeId = unidade.Id;
+                        ctrc.Peso = pesoTon;
+                        ctrc.LeadTimeDias = leadTimeDias;
+                        ctrc.DataPrevistaEntrega = dataPrevistaEntrega;
+                        ctrc.DataEntregaRealizada = dataEntrega;
+                        ctrc.Destinatario = (string)item.clienteDestinatario;
+                        ctrc.NotasFiscais = item.notasFiscais;
+                        AplicarStatusEDesvio(ctrc, dataEntrega);
+                        _db.Ctrcs.Update(ctrc);
+                    }
+
+                    await _db.SaveChangesAsync();
+
+                    await RegistrarOcorrenciaSistemaAsync(ctrc.Id, dataOcorrencia, (string?)item.descricaoUltimaOcorrencia);
+                    await _db.SaveChangesAsync();
+                    gravados++;
                 }
                 catch (Exception ex)
                 {
                     erros.Add(new LinhaErroImportacaoDTO
                     {
-                        Linha = linha,
-                        Ctrc = (string)item.ctrc,
-                        Erro = ex.Message
+                        Linha = linhaNum,
+                        Ctrc = TryGet(item, "ctrc"),
+                        Erro = ex.Message,
+                        Severidade = "Critico",
+                        CorrigidoAutomaticamente = false,
+                        Payload = item
                     });
                 }
             }
 
-            await _repo.SaveChangesAsync();
-            _cache.Remove(token);
+            if (_cache.TryGetValue(token, out ImportCacheData cacheData))
+            {
+                cacheData.LinhasComErro = erros;
+                _cache.Set(token, cacheData, TimeSpan.FromHours(2));
+            }
 
-            return (inseridos, erros);
+            return (gravados, erros);
         }
 
         // === Helpers ===
+
+        private static string? TryGet(dynamic item, string propName)
+        {
+            try
+            {
+                var dict = item as IDictionary<string, object>;
+                if (dict != null && dict.ContainsKey(propName))
+                    return dict[propName]?.ToString();
+                return (string?)item.GetType().GetProperty(propName)?.GetValue(item);
+            }
+            catch { return null; }
+        }
+
+        // =============================
+        // ✅ Correção para PostgreSQL UTC
+        // =============================
+        private static DateTime? ParseDate(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s))
+                return null;
+
+            // Tenta múltiplos formatos de data válidos no Brasil
+            string[] formatos = { "dd/MM/yyyy", "dd/MM/yy", "yyyy-MM-dd", "dd-MM-yyyy" };
+
+            if (DateTime.TryParseExact(
+                s.Trim(),
+                formatos,
+                new CultureInfo("pt-BR"),
+                DateTimeStyles.None,
+                out var data))
+            {
+                // 🔹 Força o tipo UTC (corrige erro do PostgreSQL)
+                return DateTime.SpecifyKind(data, DateTimeKind.Utc);
+            }
+
+            return null;
+        }
+
+
+        private async Task<DateTime?> ObterDataAgendaBaseAsync(int ctrcId)
+        {
+            var ag = await _db.Agendas
+                .Where(a => a.CtrcId == ctrcId)
+                .OrderByDescending(a => a.Data)
+                .Select(a => a.Data)
+                .FirstOrDefaultAsync();
+            return ag == default ? null : ag;
+        }
+
+        private void AplicarStatusEDesvio(Ctrc ctrc, DateTime? dataEntrega)
+        {
+            DateTime basePrazo;
+            var dataAgenda = ObterDataAgendaBaseAsync(ctrc.Id).GetAwaiter().GetResult();
+            if (dataAgenda.HasValue)
+                basePrazo = dataAgenda.Value.Date;
+            else
+                basePrazo = ctrc.DataEmissao.Date.AddDays(ctrc.LeadTimeDias);
+
+            if (dataEntrega.HasValue)
+            {
+                var desvio = (dataEntrega.Value.Date - basePrazo).Days;
+                ctrc.DesvioPrazoDias = desvio;
+                ctrc.StatusEntregaId = desvio > 0 ? 3 : 1;
+            }
+            else
+            {
+                ctrc.DesvioPrazoDias = null;
+                ctrc.StatusEntregaId = DateTime.UtcNow.Date > basePrazo ? 2 : 2;
+            }
+        }
+
+        private async Task<int> CalcularLeadTimeDiasAsync(int clienteId, int cidadeId)
+        {
+            var cidade = await _db.Cidades
+                .Include(c => c.Estado)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == cidadeId);
+
+            if (cidade == null) return 0;
+
+            var lead = await _db.LeadTimesCliente
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l =>
+                    l.ClienteId == clienteId &&
+                    l.TipoRegiaoId == cidade.TipoRegiaoId &&
+                    l.RegiaoEstadoId == cidade.Estado.RegiaoEstadoId);
+
+            if (lead == null)
+            {
+                lead = await _db.LeadTimesCliente
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(l =>
+                        l.ClienteId == 3573 &&
+                        l.TipoRegiaoId == cidade.TipoRegiaoId &&
+                        l.RegiaoEstadoId == cidade.Estado.RegiaoEstadoId);
+            }
+
+            return lead?.DiasLead ?? 0;
+        }
+
+        private async Task RegistrarOcorrenciaSistemaAsync(int ctrcId, DateTime? data, string? descricao)
+        {
+            if (!data.HasValue || string.IsNullOrWhiteSpace(descricao))
+                return;
+
+            var existe = await _db.OcorrenciasSistema
+                .AsNoTracking()
+                .AnyAsync(o => o.CtrcId == ctrcId && o.Data == data && o.Descricao == descricao);
+            if (existe) return;
+
+            var ultima = await _db.OcorrenciasSistema
+                .Where(o => o.CtrcId == ctrcId)
+                .OrderByDescending(o => o.Data)
+                .FirstOrDefaultAsync();
+
+            int numeroOcorrencia = (ultima?.NumeroOcorrencia ?? 0) + 1;
+            int? diasDesdeAnterior = ultima != null ? (data.Value.Date - ultima.Data.Date).Days : (int?)null;
+
+            var nova = new OcorrenciaSistema
+            {
+                CtrcId = ctrcId,
+                NumeroOcorrencia = numeroOcorrencia,
+                Data = data.Value,
+                Descricao = descricao,
+                DiasDesdeAnterior = diasDesdeAnterior
+            };
+
+            await _db.OcorrenciasSistema.AddAsync(nova);
+        }
+
         private static bool IsTipoValido(string tipo)
         {
             if (string.IsNullOrWhiteSpace(tipo))
@@ -174,7 +385,6 @@ namespace dago.Services
         private static List<CtrcCsvRow> ReadCsv(Stream stream)
         {
             using var reader = new StreamReader(stream);
-
             var config = new CsvHelper.Configuration.CsvConfiguration(CultureInfo.InvariantCulture)
             {
                 Delimiter = ";",
@@ -184,17 +394,9 @@ namespace dago.Services
                 TrimOptions = CsvHelper.Configuration.TrimOptions.Trim,
                 DetectColumnCountChanges = true
             };
-
             using var csv = new CsvReader(reader, config);
             csv.Context.RegisterClassMap<CtrcCsvRowMap>();
             return csv.GetRecords<CtrcCsvRow>().ToList();
-        }
-
-        private static DateTime ParseDate(string s)
-        {
-            if (DateTime.TryParseExact(s?.Trim(), "dd/MM/yyyy", new CultureInfo("pt-BR"), DateTimeStyles.None, out var d))
-                return d;
-            return DateTime.Now;
         }
     }
 }

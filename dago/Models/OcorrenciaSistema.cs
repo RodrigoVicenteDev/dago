@@ -20,5 +20,7 @@ namespace dago.Models
 
         [MaxLength(300)]
         public string? Descricao { get; set; }
+
+        public int? DiasDesdeAnterior { get; set; }
     }
 }

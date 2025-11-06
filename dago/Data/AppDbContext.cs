@@ -114,6 +114,19 @@ namespace dago.Data
                 .HasForeignKey(l => l.RegiaoEstadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+
+
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateOnly) || property.ClrType == typeof(DateTime))
+                    {
+                        property.SetColumnType("date");
+                    }
+                }
+            }
         }
     }
 }
