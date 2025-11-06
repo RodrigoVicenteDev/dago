@@ -1,0 +1,6 @@
+﻿namespace dago.Controllers
+{
+    public class using_dago
+    {
+    }
+}

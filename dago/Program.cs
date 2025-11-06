@@ -57,6 +57,7 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<ICtrcRepository, CtrcRepository>();
 builder.Services.AddScoped<ICtrcImportService, CtrcImportService>();
 builder.Services.AddSingleton<IBusinessDayService, BusinessDayService>();
+builder.Services.AddScoped<ICtrcGridService, CtrcGridService>();
 
 
 
