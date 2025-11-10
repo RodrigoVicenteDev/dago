@@ -1,6 +1,7 @@
 using dago.Data;
 using dago.Repository;
 using dago.Services;
+using dago.Services.Tests;
 using dago.Services.Utils;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -88,5 +89,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
-
+//await DateValidationTest.RunAsync(app.Services);
 app.Run();
+
+

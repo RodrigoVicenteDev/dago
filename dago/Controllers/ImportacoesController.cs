@@ -21,15 +21,6 @@ namespace dago.Controllers
         /// <summary>
         /// Lê e valida um arquivo CSV de CTRCs, retornando uma prévia dos dados limpos.
         /// </summary>
-        /// <remarks>
-        /// Envie o arquivo CSV no formato `multipart/form-data` com os campos:
-        /// - arquivo: o CSV exportado do sistema SSW
-        /// - praca: código da praça (ex: "GRU", "CRI")
-        /// </remarks>
-        /// <param name="request">Arquivo CSV e código da praça</param>
-        /// <response code="200">Retorna token e prévia dos registros lidos</response>
-        /// <response code="400">Se o arquivo estiver ausente ou inválido</response>
-        /// <response code="500">Erro interno durante o processamento</response>
         [HttpPost("ctrc/preview")]
         [Consumes("multipart/form-data")]
         [ProducesResponseType(typeof(object), 200)]
@@ -55,7 +46,7 @@ namespace dago.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro durante a leitura do CSV de CTRCs.");
+                _logger.LogError(ex, "❌ Erro durante a leitura do CSV de CTRCs.");
                 return StatusCode(500, new { sucesso = false, erro = ex.Message });
             }
         }
@@ -63,13 +54,6 @@ namespace dago.Controllers
         /// <summary>
         /// Confirma e grava os dados previamente validados no banco de dados.
         /// </summary>
-        /// <remarks>
-        /// Após a pré-visualização, use o token retornado para confirmar a gravação dos CTRCs válidos.
-        /// </remarks>
-        /// <param name="token">Token da pré-visualização gerado na etapa anterior</param>
-        /// <response code="200">Retorna quantos registros foram gravados e os erros pendentes</response>
-        /// <response code="400">Se o token não for informado</response>
-        /// <response code="500">Erro interno durante a gravação</response>
         [HttpPost("ctrc/confirmar/{token}")]
         [ProducesResponseType(typeof(object), 200)]
         [ProducesResponseType(400)]
@@ -93,12 +77,12 @@ namespace dago.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                _logger.LogWarning(ex, "Token de importação inválido ou expirado.");
+                _logger.LogWarning(ex, "⚠️ Token de importação inválido ou expirado.");
                 return BadRequest(new { sucesso = false, erro = ex.Message });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erro durante a confirmação de importação de CTRCs.");
+                _logger.LogError(ex, "❌ Erro durante a confirmação de importação de CTRCs.");
                 return StatusCode(500, new { sucesso = false, erro = ex.Message });
             }
         }

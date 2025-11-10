@@ -25,8 +25,54 @@ namespace dago.Data
         public DbSet<ParticularidadeCliente> ParticularidadesCliente { get; set; }
         public DbSet<RegiaoEstado> RegioesEstados { get; set; }
         public DbSet<Unidade> Unidades { get; set; }
+        public DbSet<ConfiguracaoEsporadico> ConfiguracoesEsporadico { get; set; }
+        public DbSet<ConfiguracaoEsporadicoCliente> ConfiguracaoEsporadicoClientes { get; set; }
+        public DbSet<ConfiguracaoEsporadicoUnidade> ConfiguracaoEsporadicoUnidades { get; set; }
+        public DbSet<ConfiguracaoEsporadicoDestinatario> ConfiguracaoEsporadicoDestinatarios { get; set; }
 
-        // === Configurações de relacionamento ===
+        // =====================================================
+        // 🔹 Normaliza datas antes de salvar (sem hora / sem UTC)
+        // =====================================================
+        public override int SaveChanges()
+        {
+            NormalizarDatas();
+            return base.SaveChanges();
+        }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            NormalizarDatas();
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        private void NormalizarDatas()
+        {
+            foreach (var entry in ChangeTracker.Entries())
+            {
+                foreach (var prop in entry.Properties)
+                {
+                    // 🔸 DateTime e DateTime?  → deixa só a DATA e força Kind = Unspecified
+                    if (prop.Metadata.ClrType == typeof(DateTime) ||
+                        prop.Metadata.ClrType == typeof(DateTime?))
+                    {
+                        if (prop.CurrentValue is DateTime dt)
+                        {
+                            prop.CurrentValue = DateTime.SpecifyKind(dt.Date, DateTimeKind.Unspecified);
+                        }
+                    }
+                    // 🔸 DateOnly / DateOnly? já são datas puras – não precisa mexer
+                    else if (prop.Metadata.ClrType == typeof(DateOnly) ||
+                             prop.Metadata.ClrType == typeof(DateOnly?))
+                    {
+                        // nada a fazer
+                    }
+                }
+            }
+        }
+
+        // =====================================================
+        // 🔹 Configurações de relacionamento e mapeamento
+        // =====================================================
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -66,62 +112,112 @@ namespace dago.Data
                 .HasForeignKey(ct => ct.EstadoDestinoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Relacionamento 1:N entre CTRC e OcorrenciasSistema
+            // CTRC → Ocorrências de Sistema
             modelBuilder.Entity<Ctrc>()
                 .HasMany(c => c.OcorrenciasSistema)
                 .WithOne(o => o.Ctrc)
                 .HasForeignKey(o => o.CtrcId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Relacionamento 1:N entre CTRC e OcorrenciasAtendimento
+            // CTRC → Ocorrências de Atendimento
             modelBuilder.Entity<Ctrc>()
                 .HasMany(c => c.OcorrenciasAtendimento)
                 .WithOne(o => o.Ctrc)
                 .HasForeignKey(o => o.CtrcId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Relacionamento 1:N entre CTRC e Agenda
+            // CTRC → Agendas
             modelBuilder.Entity<Ctrc>()
                 .HasMany(c => c.Agendas)
                 .WithOne(a => a.Ctrc)
                 .HasForeignKey(a => a.CtrcId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Estado (1) -> (N) Unidades
+            // Estado → Unidades
             modelBuilder.Entity<Estado>()
                 .HasMany(e => e.Unidades)
                 .WithOne(u => u.Estado)
                 .HasForeignKey(u => u.EstadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-
-            // Unidade (1) -> (N) CTRCs
+            // Unidade → CTRCs
             modelBuilder.Entity<Unidade>()
                 .HasMany(u => u.Ctrcs)
                 .WithOne(c => c.Unidade)
                 .HasForeignKey(c => c.UnidadeId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // RegiaoEstado → Estados
             modelBuilder.Entity<RegiaoEstado>()
                 .HasMany(r => r.Estados)
                 .WithOne(e => e.RegiaoEstado)
                 .HasForeignKey(e => e.RegiaoEstadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+            // LeadTimeCliente → RegiaoEstado
             modelBuilder.Entity<LeadTimeCliente>()
                 .HasOne(l => l.RegiaoEstado)
                 .WithMany()
                 .HasForeignKey(l => l.RegiaoEstadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+             //=======================================
+            // 🔹 RELACIONAMENTO - CONFIGURAÇÃO ESPORÁDICO
+            // =======================================
+            modelBuilder.Entity<ConfiguracaoEsporadico>(entity =>
+            {
+                entity.ToTable("ConfiguracoesEsporadico");
+
+                entity.HasMany(e => e.ClientesExcluidos)
+                    .WithOne()
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(e => e.UnidadesExcluidas)
+                    .WithOne()
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(e => e.DestinatariosExcluidos)
+                    .WithOne()
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<ConfiguracaoEsporadicoCliente>(entity =>
+            {
+                entity.ToTable("ConfiguracaoEsporadicoClientes");
+                entity.HasKey(e => e.Id);
+                entity.HasOne<Cliente>()
+                    .WithMany()
+                    .HasForeignKey(e => e.ClienteId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ConfiguracaoEsporadicoUnidade>(entity =>
+            {
+                entity.ToTable("ConfiguracaoEsporadicoUnidades");
+                entity.HasKey(e => e.Id);
+                entity.HasOne<Unidade>()
+                    .WithMany()
+                    .HasForeignKey(e => e.UnidadeId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<ConfiguracaoEsporadicoDestinatario>(entity =>
+            {
+                entity.ToTable("ConfiguracaoEsporadicoDestinatarios");
+                entity.HasKey(e => e.Id);
+            });
 
 
-
+            // 🔹 Aqui está o ponto crucial:
+            //    TODAS as propriedades DateTime/DateTime?/DateOnly ficam com tipo "date"
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
                 foreach (var property in entityType.GetProperties())
                 {
-                    if (property.ClrType == typeof(DateOnly) || property.ClrType == typeof(DateTime))
+                    if (property.ClrType == typeof(DateTime) ||
+                        property.ClrType == typeof(DateTime?) ||
+                        property.ClrType == typeof(DateOnly) ||
+                        property.ClrType == typeof(DateOnly?))
                     {
                         property.SetColumnType("date");
                     }

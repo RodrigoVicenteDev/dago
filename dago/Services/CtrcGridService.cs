@@ -14,17 +14,18 @@ namespace dago.Services
             _db = db;
         }
 
+        // =============================
         // LISTAGEM PRINCIPAL PARA O GRID
+        // =============================
         public async Task<List<CtrcGridDTO>> ListarAsync(int usuarioId, string cargo, DateTime? dataInicio, DateTime? dataFim)
         {
-            // 1️⃣ Intervalo de datas seguro
-            var fim = dataFim?.Date ?? DateTime.UtcNow.Date;
+            // 🔹 Sempre trabalhar com datas puras (sem hora)
+            var fim = dataFim?.Date ?? DateTime.Today;
             var inicio = dataInicio?.Date ?? fim.AddDays(-30);
 
             if ((fim - inicio).TotalDays > 60)
                 throw new InvalidOperationException("O período máximo permitido é de 60 dias.");
 
-            // 2️⃣ Query base
             var query = _db.Ctrcs
                 .Include(c => c.Cliente)
                 .Include(c => c.CidadeDestino).ThenInclude(ci => ci.Estado)
@@ -35,7 +36,7 @@ namespace dago.Services
                 .Where(c => c.DataEmissao >= inicio && c.DataEmissao <= fim)
                 .AsNoTracking();
 
-            // 3️⃣ Filtro por cargo
+            // 🔹 Filtro por cargo
             if (!string.Equals(cargo, "gerente", StringComparison.OrdinalIgnoreCase))
             {
                 var clientesIds = await _db.Clientes
@@ -43,30 +44,19 @@ namespace dago.Services
                     .Select(x => x.Id)
                     .ToListAsync();
 
-                Console.WriteLine($"👤 UsuarioId={usuarioId}, Cargo={cargo}, Clientes vinculados: {string.Join(", ", clientesIds)}");
-
                 if (clientesIds.Any())
-                {
                     query = query.Where(c => clientesIds.Contains(c.ClienteId));
-                }
                 else
-                {
-                    Console.WriteLine($"⚠️ Nenhum cliente vinculado ao usuário {usuarioId}. Nenhum CTRC será retornado.");
                     return new List<CtrcGridDTO>();
-                }
-            }
-            else
-            {
-                Console.WriteLine("👔 Cargo=Gerente — listando todos os CTRCs sem filtro de cliente.");
             }
 
-            // 4️⃣ Projeção otimizada
+            // 🔹 Projeção otimizada
             var lista = await query
                 .Select(c => new CtrcGridDTO
                 {
                     Id = c.Id,
                     Ctrc = c.Numero,
-                    DataEmissao = c.DataEmissao,
+                    DataEmissao = c.DataEmissao.Date,
                     Cliente = c.Cliente.Nome,
                     CidadeEntrega = c.CidadeDestino.Nome,
                     Uf = c.EstadoDestino.Sigla,
@@ -77,30 +67,23 @@ namespace dago.Services
                         .OrderByDescending(o => o.Data)
                         .Select(o => o.Descricao)
                         .FirstOrDefault(),
-                    DataPrevistaEntrega = c.DataPrevistaEntrega,
-                    DataEntregaRealizada = c.DataEntregaRealizada,
+                    DataPrevistaEntrega = c.DataPrevistaEntrega.HasValue ? c.DataPrevistaEntrega.Value.Date : null,
+                    DataEntregaRealizada = c.DataEntregaRealizada.HasValue ? c.DataEntregaRealizada.Value.Date : null,
                     Peso = c.Peso,
                     StatusEntregaId = c.StatusEntregaId,
                     StatusEntregaNome = c.StatusEntrega.Nome,
                     DesvioPrazoDias = c.DesvioPrazoDias,
                     NotasFiscais = c.NotasFiscais,
-                    Observacao = c.Observacao,
-                    UltimaOcorrenciaAtendimentoId = c.OcorrenciasAtendimento
-                        .OrderByDescending(o => o.Data)
-                        .Select(o => (int?)o.Id)
-                        .FirstOrDefault(),
-                    UltimaDescricaoOcorrenciaAtendimento = c.OcorrenciasAtendimento
-                        .OrderByDescending(o => o.Data)
-                        .Select(o => o.Descricao)
-                        .FirstOrDefault()
+                    Observacao = c.Observacao
                 })
                 .ToListAsync();
 
-            Console.WriteLine($"✅ Total de CTRCs retornados: {lista.Count}");
             return lista;
         }
 
-        // LOOKUPS PARA COMBOS (Status + Tipos de Ocorrência)
+        // =====================================
+        // LOOKUPS PARA COMBOS (Status + Ocorrência)
+        // =====================================
         public async Task<CtrcGridLookupsDTO> ObterLookupsAsync()
         {
             var statuses = await _db.StatusesEntrega
@@ -130,39 +113,54 @@ namespace dago.Services
             };
         }
 
-        // UPDATE INLINE (autosave do AG Grid)
+        // ============================
+        // UPDATE INLINE (edição do grid)
+        // ============================
         public async Task AtualizarAsync(int ctrcId, CtrcGridUpdateDTO dto)
         {
             var ctrc = await _db.Ctrcs.FirstOrDefaultAsync(c => c.Id == ctrcId);
             if (ctrc == null)
                 throw new InvalidOperationException("CTRC não encontrado.");
 
+            bool recalcularPrazo = false;
+
+            // 🔹 Atualiza DataEntregaRealizada
             if (dto.DataEntregaRealizada.HasValue)
             {
                 ctrc.DataEntregaRealizada = dto.DataEntregaRealizada.Value.Date;
-                var basePrazo = ctrc.DataPrevistaEntrega?.Date ?? ctrc.DataEmissao.Date.AddDays(ctrc.LeadTimeDias);
-                ctrc.DesvioPrazoDias = (ctrc.DataEntregaRealizada.Value.Date - basePrazo).Days;
-
-                if (!dto.StatusEntregaId.HasValue)
-                    ctrc.StatusEntregaId = ctrc.DesvioPrazoDias > 0 ? 3 : 1;
+                recalcularPrazo = true;
             }
 
+            // 🔹 Atualiza Status
             if (dto.StatusEntregaId.HasValue && dto.StatusEntregaId.Value > 0)
                 ctrc.StatusEntregaId = dto.StatusEntregaId.Value;
 
+            // 🔹 Atualiza Observação
             if (dto.Observacao != null)
                 ctrc.Observacao = dto.Observacao;
 
+            // 🔹 Adiciona Ocorrência (texto livre)
             if (!string.IsNullOrWhiteSpace(dto.DescricaoOcorrenciaAtendimento))
             {
                 var ocorr = new OcorrenciaAtendimento
                 {
                     CtrcId = ctrc.Id,
-                    Data = DateTime.UtcNow,
+                    Data = DateTime.Today,
                     Descricao = dto.DescricaoOcorrenciaAtendimento,
                     ReplicaClientes = false
                 };
                 await _db.OcorrenciasAtendimento.AddAsync(ocorr);
+            }
+
+            // 🔹 Recalcula desvio e status automático
+            if (recalcularPrazo && ctrc.DataEntregaRealizada.HasValue)
+            {
+                var entrega = ctrc.DataEntregaRealizada.Value.Date;
+                var prazo = ctrc.DataPrevistaEntrega?.Date ?? ctrc.DataEmissao.Date.AddDays(ctrc.LeadTimeDias);
+
+                ctrc.DesvioPrazoDias = (entrega - prazo).Days;
+                if (!dto.StatusEntregaId.HasValue)
+                    ctrc.StatusEntregaId = ctrc.DesvioPrazoDias > 0 ? 3 : 1;
             }
 
             await _db.SaveChangesAsync();

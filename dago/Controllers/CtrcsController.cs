@@ -25,7 +25,7 @@ namespace dago.Controllers
         [HttpGet("grid")]
         public async Task<IActionResult> GetGrid([FromQuery] DateTime? dataInicio, [FromQuery] DateTime? dataFim)
         {
-            // 🔹 Extrai o ID do usuário autenticado
+            // 🔹 Extrai o ID e cargo do JWT
             var usuarioIdClaim =
                 User.FindFirst("sub") ??
                 User.FindFirst(ClaimTypes.NameIdentifier) ??
@@ -36,7 +36,6 @@ namespace dago.Controllers
             var usuarioId = int.TryParse(usuarioIdClaim?.Value, out var id) ? id : 0;
             var cargoId = int.TryParse(cargoIdClaim?.Value, out var cid) ? cid : 0;
 
-            // 🔹 Mapeia cargoId → nome legível
             var cargo = cargoId switch
             {
                 1 => "Administrador",
@@ -46,13 +45,16 @@ namespace dago.Controllers
                 _ => "Atendente"
             };
 
+            // 🔹 Padroniza datas para “somente data”
+            var inicio = dataInicio?.Date;
+            var fim = dataFim?.Date;
+
             Console.WriteLine("──────────────────────────────────────────────");
             Console.WriteLine($"🔐 JWT Claims → UsuarioId={usuarioId}, CargoId={cargoId} ({cargo})");
-            Console.WriteLine($"📅 Filtro de datas: {dataInicio:yyyy-MM-dd} → {dataFim:yyyy-MM-dd}");
+            Console.WriteLine($"📅 Filtro de datas: {inicio:yyyy-MM-dd} → {fim:yyyy-MM-dd}");
             Console.WriteLine("──────────────────────────────────────────────");
 
-            // 🔹 Chama o serviço
-            var lista = await _gridService.ListarAsync(usuarioId, cargo, dataInicio, dataFim);
+            var lista = await _gridService.ListarAsync(usuarioId, cargo, inicio, fim);
 
             Console.WriteLine($"📤 Retornando {lista.Count} registros no grid\n");
 
@@ -81,6 +83,10 @@ namespace dago.Controllers
         {
             if (dto == null)
                 return BadRequest("Payload inválido.");
+
+            // 🔹 Garante que a data venha sem hora
+            if (dto.DataEntregaRealizada.HasValue)
+                dto.DataEntregaRealizada = dto.DataEntregaRealizada.Value.Date;
 
             await _gridService.AtualizarAsync(id, dto);
             return NoContent();
