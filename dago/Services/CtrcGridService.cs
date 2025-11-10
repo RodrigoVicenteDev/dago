@@ -19,7 +19,6 @@ namespace dago.Services
         // =============================
         public async Task<List<CtrcGridDTO>> ListarAsync(int usuarioId, string cargo, DateTime? dataInicio, DateTime? dataFim)
         {
-            // 🔹 Sempre trabalhar com datas puras (sem hora)
             var fim = dataFim?.Date ?? DateTime.Today;
             var inicio = dataInicio?.Date ?? fim.AddDays(-30);
 
@@ -36,7 +35,7 @@ namespace dago.Services
                 .Where(c => c.DataEmissao >= inicio && c.DataEmissao <= fim)
                 .AsNoTracking();
 
-            // 🔹 Filtro por cargo
+            // 🔹 Filtro de acesso: apenas não-gerentes têm restrições
             if (!string.Equals(cargo, "gerente", StringComparison.OrdinalIgnoreCase))
             {
                 var clientesIds = await _db.Clientes
@@ -44,14 +43,95 @@ namespace dago.Services
                     .Select(x => x.Id)
                     .ToListAsync();
 
-                if (clientesIds.Any())
-                    query = query.Where(c => clientesIds.Contains(c.ClienteId));
-                else
+                if (!clientesIds.Any())
                     return new List<CtrcGridDTO>();
+
+                bool isEsporadico = clientesIds.Contains(3573);
+
+                Console.WriteLine(isEsporadico
+                    ? "👀 Modo ESPORÁDICO: exibindo todos os CTRCs exceto os excluídos."
+                    : "👀 Modo NORMAL: exibindo apenas clientes vinculados ao usuário.");
+
+                // 🔸 Se NÃO for esporádico → filtra apenas clientes atribuídos
+                if (!isEsporadico)
+                    query = query.Where(c => clientesIds.Contains(c.ClienteId));
+
+                // 🔹 Executa query base com projeção anônima (para incluir IDs e DTO juntos)
+                var listaRaw = await query
+                    .Select(c => new
+                    {
+                        ClienteId = c.ClienteId,
+                        UnidadeId = c.UnidadeId,
+                        Destinatario = c.Destinatario,
+                        Dto = new CtrcGridDTO
+                        {
+                            Id = c.Id,
+                            Ctrc = c.Numero,
+                            DataEmissao = c.DataEmissao.Date,
+                            Cliente = c.Cliente.Nome,
+                            CidadeEntrega = c.CidadeDestino.Nome,
+                            Uf = c.EstadoDestino.Sigla,
+                            Unidade = c.Unidade.Nome,
+                            Destinatario = c.Destinatario,
+                            NumeroNotaFiscal = c.NumeroNotaFiscal ?? string.Empty,
+                            UltimaOcorrenciaSistema = c.OcorrenciasSistema
+                                .OrderByDescending(o => o.Data)
+                                .Select(o => o.Descricao)
+                                .FirstOrDefault(),
+                            DataPrevistaEntrega = c.DataPrevistaEntrega.HasValue ? c.DataPrevistaEntrega.Value.Date : null,
+                            DataEntregaRealizada = c.DataEntregaRealizada.HasValue ? c.DataEntregaRealizada.Value.Date : null,
+                            Peso = c.Peso,
+                            StatusEntregaId = c.StatusEntregaId,
+                            StatusEntregaNome = c.StatusEntrega.Nome,
+                            DesvioPrazoDias = c.DesvioPrazoDias,
+                            NotasFiscais = c.NotasFiscais,
+                            Observacao = c.Observacao
+                        }
+                    })
+                    .ToListAsync();
+
+                // 🔹 Aplica filtros de configuração de esporádicos (somente se o usuário for esporádico)
+                if (isEsporadico)
+                {
+                    var config = await _db.ConfiguracoesEsporadico
+                        .Include(x => x.ClientesExcluidos)
+                        .Include(x => x.UnidadesExcluidas)
+                        .Include(x => x.DestinatariosExcluidos)
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync();
+
+                    if (config != null)
+                    {
+                        var clientesExcluidos = config.ClientesExcluidos.Select(c => c.ClienteId).ToHashSet();
+                        var unidadesExcluidas = config.UnidadesExcluidas.Select(u => u.UnidadeId).ToHashSet();
+                        var destinatariosExcluidos = config.DestinatariosExcluidos
+                            .Select(d => d.Destinatario.ToUpperInvariant())
+                            .ToHashSet();
+
+                        Console.WriteLine("⚙️ Aplicando filtros de esporádico (em memória)");
+                        Console.WriteLine($" - Clientes excluídos: {string.Join(", ", clientesExcluidos)}");
+                        Console.WriteLine($" - Unidades excluídas: {string.Join(", ", unidadesExcluidas)}");
+                        Console.WriteLine($" - Destinatários excluídos: {string.Join(", ", destinatariosExcluidos)}");
+
+                        var totalAntes = listaRaw.Count;
+
+                        listaRaw = listaRaw
+                            .Where(x =>
+                                !clientesExcluidos.Contains(x.ClienteId) &&
+                                !unidadesExcluidas.Contains(x.UnidadeId) &&
+                                !destinatariosExcluidos.Contains((x.Destinatario ?? string.Empty).ToUpperInvariant()))
+                            .ToList();
+
+                        Console.WriteLine($"📊 Filtro esporádico → antes: {totalAntes}, depois: {listaRaw.Count}");
+                    }
+                }
+
+                // 🔹 Retorna apenas o DTO final
+                return listaRaw.Select(x => x.Dto).ToList();
             }
 
-            // 🔹 Projeção otimizada
-            var lista = await query
+            // 🔹 Caso o usuário seja gerente → retorna todos os CTRCs sem restrições
+            var listaCompleta = await query
                 .Select(c => new CtrcGridDTO
                 {
                     Id = c.Id,
@@ -78,8 +158,9 @@ namespace dago.Services
                 })
                 .ToListAsync();
 
-            return lista;
+            return listaCompleta;
         }
+
 
         // =====================================
         // LOOKUPS PARA COMBOS (Status + Ocorrência)

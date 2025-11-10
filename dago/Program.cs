@@ -59,6 +59,10 @@ builder.Services.AddScoped<ICtrcRepository, CtrcRepository>();
 builder.Services.AddScoped<ICtrcImportService, CtrcImportService>();
 builder.Services.AddSingleton<IBusinessDayService, BusinessDayService>();
 builder.Services.AddScoped<ICtrcGridService, CtrcGridService>();
+builder.Services.AddScoped<UnidadeService>();
+builder.Services.AddScoped<UnidadeRepository>();
+builder.Services.AddScoped<IConfiguracaoEsporadicoService, ConfiguracaoEsporadicoService>();
+builder.Services.AddScoped<IConfiguracaoEsporadicoRepository, ConfiguracaoEsporadicoRepository>();
 
 
 

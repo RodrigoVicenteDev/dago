@@ -4,60 +4,61 @@ using System.Collections.Generic;
 
 namespace dago.Models
 {
-    /// <summary>
-    /// Define as regras globais para filtragem de CTRCs esporádicos.
-    /// O gerente pode configurar listas de clientes, unidades e destinatários
-    /// que NÃO devem aparecer na visão dos usuários esporádicos.
-    /// </summary>
     public class ConfiguracaoEsporadico
     {
         [Key]
         public int Id { get; set; }
 
-        /// <summary>
-        /// Clientes que NÃO fazem parte dos CTRCs esporádicos.
-        /// </summary>
         public List<ConfiguracaoEsporadicoCliente> ClientesExcluidos { get; set; } = new();
-
-        /// <summary>
-        /// Unidades que NÃO fazem parte dos CTRCs esporádicos.
-        /// </summary>
         public List<ConfiguracaoEsporadicoUnidade> UnidadesExcluidas { get; set; } = new();
-
-        /// <summary>
-        /// Destinatários (texto) que NÃO fazem parte dos CTRCs esporádicos.
-        /// </summary>
         public List<ConfiguracaoEsporadicoDestinatario> DestinatariosExcluidos { get; set; } = new();
     }
 
-    // 👇 Subentidades simples (relacionadas à principal)
-
+    // ===============================
+    // CLIENTES EXCLUÍDOS
+    // ===============================
     public class ConfiguracaoEsporadicoCliente
     {
         [Key]
         public int Id { get; set; }
 
+        [ForeignKey(nameof(ConfiguracaoEsporadico))]
+        public int ConfiguracaoEsporadicoId { get; set; }
+        public ConfiguracaoEsporadico ConfiguracaoEsporadico { get; set; } = null!;
+
         [ForeignKey(nameof(Cliente))]
         public int ClienteId { get; set; }
-
         public Cliente Cliente { get; set; } = null!;
     }
 
+    // ===============================
+    // UNIDADES EXCLUÍDAS
+    // ===============================
     public class ConfiguracaoEsporadicoUnidade
     {
         [Key]
         public int Id { get; set; }
 
+        [ForeignKey(nameof(ConfiguracaoEsporadico))]
+        public int ConfiguracaoEsporadicoId { get; set; }
+        public ConfiguracaoEsporadico ConfiguracaoEsporadico { get; set; } = null!;
+
         [ForeignKey(nameof(Unidade))]
         public int UnidadeId { get; set; }
-
         public Unidade Unidade { get; set; } = null!;
     }
 
+    // ===============================
+    // DESTINATÁRIOS EXCLUÍDOS
+    // ===============================
     public class ConfiguracaoEsporadicoDestinatario
     {
         [Key]
         public int Id { get; set; }
+
+        [ForeignKey(nameof(ConfiguracaoEsporadico))]
+        public int ConfiguracaoEsporadicoId { get; set; }
+        public ConfiguracaoEsporadico ConfiguracaoEsporadico { get; set; } = null!;
 
         [Required]
         [MaxLength(255)]

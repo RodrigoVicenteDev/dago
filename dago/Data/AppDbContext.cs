@@ -161,7 +161,7 @@ namespace dago.Data
                 .HasForeignKey(l => l.RegiaoEstadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-             //=======================================
+            // =======================================
             // 🔹 RELACIONAMENTO - CONFIGURAÇÃO ESPORÁDICO
             // =======================================
             modelBuilder.Entity<ConfiguracaoEsporadico>(entity =>
@@ -169,44 +169,20 @@ namespace dago.Data
                 entity.ToTable("ConfiguracoesEsporadico");
 
                 entity.HasMany(e => e.ClientesExcluidos)
-                    .WithOne()
+                    .WithOne(c => c.ConfiguracaoEsporadico)
+                    .HasForeignKey(c => c.ConfiguracaoEsporadicoId)
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasMany(e => e.UnidadesExcluidas)
-                    .WithOne()
+                    .WithOne(u => u.ConfiguracaoEsporadico)
+                    .HasForeignKey(u => u.ConfiguracaoEsporadicoId)
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasMany(e => e.DestinatariosExcluidos)
-                    .WithOne()
+                    .WithOne(d => d.ConfiguracaoEsporadico)
+                    .HasForeignKey(d => d.ConfiguracaoEsporadicoId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
-
-            modelBuilder.Entity<ConfiguracaoEsporadicoCliente>(entity =>
-            {
-                entity.ToTable("ConfiguracaoEsporadicoClientes");
-                entity.HasKey(e => e.Id);
-                entity.HasOne<Cliente>()
-                    .WithMany()
-                    .HasForeignKey(e => e.ClienteId)
-                    .OnDelete(DeleteBehavior.Restrict);
-            });
-
-            modelBuilder.Entity<ConfiguracaoEsporadicoUnidade>(entity =>
-            {
-                entity.ToTable("ConfiguracaoEsporadicoUnidades");
-                entity.HasKey(e => e.Id);
-                entity.HasOne<Unidade>()
-                    .WithMany()
-                    .HasForeignKey(e => e.UnidadeId)
-                    .OnDelete(DeleteBehavior.Restrict);
-            });
-
-            modelBuilder.Entity<ConfiguracaoEsporadicoDestinatario>(entity =>
-            {
-                entity.ToTable("ConfiguracaoEsporadicoDestinatarios");
-                entity.HasKey(e => e.Id);
-            });
-
 
             // 🔹 Aqui está o ponto crucial:
             //    TODAS as propriedades DateTime/DateTime?/DateOnly ficam com tipo "date"
