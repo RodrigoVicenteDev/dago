@@ -21,6 +21,8 @@
         public decimal Peso { get; set; }
 
         public int StatusEntregaId { get; set; }
+
+        public DateTime? DataAgenda { get; set; }
         public string StatusEntregaNome { get; set; } = string.Empty;
         public int? DesvioPrazoDias { get; set; }
 

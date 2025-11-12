@@ -63,6 +63,7 @@ builder.Services.AddScoped<UnidadeService>();
 builder.Services.AddScoped<UnidadeRepository>();
 builder.Services.AddScoped<IConfiguracaoEsporadicoService, ConfiguracaoEsporadicoService>();
 builder.Services.AddScoped<IConfiguracaoEsporadicoRepository, ConfiguracaoEsporadicoRepository>();
+builder.Services.AddScoped<AgendaService>();
 
 
 

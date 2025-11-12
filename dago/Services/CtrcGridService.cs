@@ -32,6 +32,7 @@ namespace dago.Services
                 .Include(c => c.StatusEntrega)
                 .Include(c => c.OcorrenciasSistema)
                 .Include(c => c.OcorrenciasAtendimento)
+                .Include(c => c.Agendas)
                 .Where(c => c.DataEmissao >= inicio && c.DataEmissao <= fim)
                 .AsNoTracking();
 
@@ -85,10 +86,34 @@ namespace dago.Services
                             StatusEntregaNome = c.StatusEntrega.Nome,
                             DesvioPrazoDias = c.DesvioPrazoDias,
                             NotasFiscais = c.NotasFiscais,
-                            Observacao = c.Observacao
+                            Observacao = c.Observacao,
+                            DataAgenda = c.Agendas
+                                .OrderByDescending(a => a.Data)
+                                .Select(a => (DateTime?)a.Data)
+                                .FirstOrDefault(),
                         }
                     })
                     .ToListAsync();
+
+                // 🔹 Recalcula o desvio aqui, seguindo a sua regra (M-K, mas K=Agenda se existir)
+                foreach (var x in listaRaw)
+                {
+                    var dto = x.Dto;
+
+                    if (dto.DataEntregaRealizada.HasValue)
+                    {
+                        var basePrazo =
+                            (dto.DataAgenda.HasValue ? dto.DataAgenda.Value.Date
+                            : dto.DataPrevistaEntrega.HasValue ? dto.DataPrevistaEntrega.Value.Date
+                            : dto.DataEmissao.Date); // fallback extremo
+
+                        dto.DesvioPrazoDias = (dto.DataEntregaRealizada.Value.Date - basePrazo).Days;
+                    }
+                    else
+                    {
+                        dto.DesvioPrazoDias = null;
+                    }
+                }
 
                 // 🔹 Aplica filtros de configuração de esporádicos (somente se o usuário for esporádico)
                 if (isEsporadico)
@@ -132,31 +157,54 @@ namespace dago.Services
 
             // 🔹 Caso o usuário seja gerente → retorna todos os CTRCs sem restrições
             var listaCompleta = await query
-                .Select(c => new CtrcGridDTO
+              .Select(c => new CtrcGridDTO
+              {
+                  Id = c.Id,
+                  Ctrc = c.Numero,
+                  DataEmissao = c.DataEmissao.Date,
+                  Cliente = c.Cliente.Nome,
+                  CidadeEntrega = c.CidadeDestino.Nome,
+                  Uf = c.EstadoDestino.Sigla,
+                  Unidade = c.Unidade.Nome,
+                  Destinatario = c.Destinatario,
+                  NumeroNotaFiscal = c.NumeroNotaFiscal ?? string.Empty,
+                  UltimaOcorrenciaSistema = c.OcorrenciasSistema
+                      .OrderByDescending(o => o.Data)
+                      .Select(o => o.Descricao)
+                      .FirstOrDefault(),
+                  DataPrevistaEntrega = c.DataPrevistaEntrega.HasValue ? c.DataPrevistaEntrega.Value.Date : null,
+                  DataEntregaRealizada = c.DataEntregaRealizada.HasValue ? c.DataEntregaRealizada.Value.Date : null,
+                  Peso = c.Peso,
+                  StatusEntregaId = c.StatusEntregaId,
+                  StatusEntregaNome = c.StatusEntrega.Nome,
+                  DesvioPrazoDias = c.DesvioPrazoDias,
+                  NotasFiscais = c.NotasFiscais,
+                  Observacao = c.Observacao,
+
+                  // 🟢 NOVO CAMPO
+                  DataAgenda = c.Agendas
+                    .OrderByDescending(a => a.Data)
+                    .Select(a => (DateTime?)a.Data)
+                    .FirstOrDefault(),
+              })
+              .ToListAsync();
+
+            foreach (var dto in listaCompleta)
+            {
+                if (dto.DataEntregaRealizada.HasValue)
                 {
-                    Id = c.Id,
-                    Ctrc = c.Numero,
-                    DataEmissao = c.DataEmissao.Date,
-                    Cliente = c.Cliente.Nome,
-                    CidadeEntrega = c.CidadeDestino.Nome,
-                    Uf = c.EstadoDestino.Sigla,
-                    Unidade = c.Unidade.Nome,
-                    Destinatario = c.Destinatario,
-                    NumeroNotaFiscal = c.NumeroNotaFiscal ?? string.Empty,
-                    UltimaOcorrenciaSistema = c.OcorrenciasSistema
-                        .OrderByDescending(o => o.Data)
-                        .Select(o => o.Descricao)
-                        .FirstOrDefault(),
-                    DataPrevistaEntrega = c.DataPrevistaEntrega.HasValue ? c.DataPrevistaEntrega.Value.Date : null,
-                    DataEntregaRealizada = c.DataEntregaRealizada.HasValue ? c.DataEntregaRealizada.Value.Date : null,
-                    Peso = c.Peso,
-                    StatusEntregaId = c.StatusEntregaId,
-                    StatusEntregaNome = c.StatusEntrega.Nome,
-                    DesvioPrazoDias = c.DesvioPrazoDias,
-                    NotasFiscais = c.NotasFiscais,
-                    Observacao = c.Observacao
-                })
-                .ToListAsync();
+                    var basePrazo =
+                        (dto.DataAgenda.HasValue ? dto.DataAgenda.Value.Date
+                        : dto.DataPrevistaEntrega.HasValue ? dto.DataPrevistaEntrega.Value.Date
+                        : dto.DataEmissao.Date);
+
+                    dto.DesvioPrazoDias = (dto.DataEntregaRealizada.Value.Date - basePrazo).Days;
+                }
+                else
+                {
+                    dto.DesvioPrazoDias = null;
+                }
+            }
 
             return listaCompleta;
         }
@@ -237,12 +285,24 @@ namespace dago.Services
             if (recalcularPrazo && ctrc.DataEntregaRealizada.HasValue)
             {
                 var entrega = ctrc.DataEntregaRealizada.Value.Date;
-                var prazo = ctrc.DataPrevistaEntrega?.Date ?? ctrc.DataEmissao.Date.AddDays(ctrc.LeadTimeDias);
+
+                // 🔧 usa a agenda mais recente, se existir; senão, a data prevista (ou emissao+lead)
+                var dataAgenda = await _db.Agendas
+                    .Where(a => a.CtrcId == ctrc.Id)
+                    .OrderByDescending(a => a.Data)
+                    .Select(a => (DateTime?)a.Data)
+                    .FirstOrDefaultAsync();
+
+                var prazo = (dataAgenda?.Date)
+                    ?? (ctrc.DataPrevistaEntrega?.Date)
+                    ?? ctrc.DataEmissao.Date.AddDays(ctrc.LeadTimeDias);
 
                 ctrc.DesvioPrazoDias = (entrega - prazo).Days;
+
                 if (!dto.StatusEntregaId.HasValue)
                     ctrc.StatusEntregaId = ctrc.DesvioPrazoDias > 0 ? 3 : 1;
             }
+
 
             await _db.SaveChangesAsync();
         }
