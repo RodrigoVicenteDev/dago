@@ -125,8 +125,14 @@ namespace dago.Services
                     try { pesoTon = (decimal)(item.pesoToneladas ?? 0m); }
                     catch { pesoTon = 0; }
 
-                    int leadTimeDias = await CalcularLeadTimeDiasAsync(cliente.Id, cidade.Id);
-                    DateTime? dataPrevistaEntrega = dataEmissao?.AddDays(leadTimeDias);
+                    int leadTimeDias = await CalcularLeadTimeDiasAsync(cliente.Id, cidade.Id, estado.Id);
+                    DateTime? dataPrevistaEntrega = null;
+                    if (dataEmissao.HasValue && leadTimeDias > 0)
+                    {
+                        dataPrevistaEntrega = AdicionarDiasUteis(dataEmissao.Value, leadTimeDias);
+                    }
+
+
 
                     var ctrc = await _db.Ctrcs.FirstOrDefaultAsync(c => c.Numero == numeroCtrc);
                     if (ctrc == null)
@@ -154,7 +160,10 @@ namespace dago.Services
                     {
                         ctrc.DataEmissao = dataEmissao ?? ctrc.DataEmissao;
                         ctrc.DataPrevistaEntrega = dataPrevistaEntrega;
-                        ctrc.DataEntregaRealizada = dataEntrega;
+
+                        if (dataEntrega.HasValue)
+                            ctrc.DataEntregaRealizada = dataEntrega;
+
                         AplicarStatusEDesvio(ctrc, dataEntrega);
                         _db.Ctrcs.Update(ctrc);
                     }
@@ -254,45 +263,63 @@ namespace dago.Services
 
         }
 
-        private async Task<int> CalcularLeadTimeDiasAsync(int clienteId, int cidadeId)
+        private static DateTime AdicionarDiasUteis(DateTime dataInicial, int diasUteis)
         {
-            var cidade = await _db.Cidades
-                .Include(c => c.Estado)
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.Id == cidadeId);
+            var data = dataInicial.Date;
+            int adicionados = 0;
 
-            if (cidade == null)
-                return 0;
+            while (adicionados < diasUteis)
+            {
+                data = data.AddDays(1);
 
-            // 🧠 1️⃣ Tenta buscar LeadTime específico do cliente
-            var lead = await _db.LeadTimesCliente
+                // pula sábado e domingo
+                if (data.DayOfWeek != DayOfWeek.Saturday &&
+                    data.DayOfWeek != DayOfWeek.Sunday)
+                {
+                    adicionados++;
+                }
+            }
+
+            return data;
+        }
+
+        private async Task<int> CalcularLeadTimeDiasAsync(int clienteId, int cidadeId, int estadoId)
+        {
+            // 1️⃣ LeadTime específico do cliente para a combinação Cidade + Estado
+            var leadCliente = await _db.LeadTimesCliente
                 .AsNoTracking()
                 .FirstOrDefaultAsync(l =>
                     l.ClienteId == clienteId &&
-                    l.TipoRegiaoId == cidade.TipoRegiaoId &&
-                    (l.RegiaoEstadoId == cidade.Estado.RegiaoEstadoId || l.RegiaoEstadoId == 0));
+                    l.CidadeId == cidadeId &&
+                    l.EstadoId == estadoId);
 
-            if (lead != null)
-                return lead.DiasLead;
+            if (leadCliente != null)
+                return leadCliente.DiasLead;
 
-            // 🧩 2️⃣ Se não encontrou, busca o LeadTime do cliente “Esporádico” (ID 3573)
+            // 2️⃣ LeadTime do cliente "Esporádico" (ID 3573)
             var leadEsporadico = await _db.LeadTimesCliente
                 .AsNoTracking()
                 .FirstOrDefaultAsync(l =>
                     l.ClienteId == 3573 &&
-                    l.TipoRegiaoId == cidade.TipoRegiaoId &&
-                    (l.RegiaoEstadoId == cidade.Estado.RegiaoEstadoId || l.RegiaoEstadoId == 0));
+                    l.CidadeId == cidadeId &&
+                    l.EstadoId == estadoId);
 
             if (leadEsporadico != null)
             {
-                Console.WriteLine($"ℹ️ Cliente {clienteId} sem lead próprio — usando LeadTime do Esporádico ({leadEsporadico.DiasLead} dias)");
+                Console.WriteLine(
+                    $"ℹ️ Cliente {clienteId} sem lead próprio — usando LeadTime do Esporádico ({leadEsporadico.DiasLead} dias)."
+                );
                 return leadEsporadico.DiasLead;
             }
 
-            // 🪫 3️⃣ Caso extremo — nenhum lead configurado
-            Console.WriteLine($"⚠️ Nenhum LeadTime encontrado para Cliente {clienteId} nem para Esporádico.");
+            // 3️⃣ Nenhum lead time configurado
+            Console.WriteLine(
+                $"⚠️ Nenhum LeadTime encontrado para Cliente {clienteId}, Cidade {cidadeId}, Estado {estadoId}, nem para Esporádico."
+            );
+
             return 0;
         }
+
 
     }
 }

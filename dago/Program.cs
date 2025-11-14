@@ -95,6 +95,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 //await DateValidationTest.RunAsync(app.Services);
+//await dago.Tests.CtrcImportTest.RunAsync(app.Services);
+
 app.Run();
 
 

@@ -1,6 +1,9 @@
 ﻿using dago.Data;
 using dago.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace dago.Services.Utils
 {
@@ -13,7 +16,46 @@ namespace dago.Services.Utils
             _db = db;
         }
 
-        // 🔹 Resolve ou cria cliente, cidade, estado e unidade
+        // ============================================================
+        // NORMALIZAÇÃO ROBUSTA (IGNORA ACENTOS / Ç / CASE / EXTRAS)
+        // ============================================================
+        public static string Normalize(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return string.Empty;
+
+            // Remove múltiplos espaços
+            string text = Regex.Replace(input.Trim(), @"\s+", " ");
+
+            // Remove acentos
+            var sb = new StringBuilder();
+            foreach (char c in text.Normalize(NormalizationForm.FormD))
+            {
+                if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                    sb.Append(c);
+            }
+
+            string semAcentos = sb.ToString().Normalize(NormalizationForm.FormC);
+
+            // ç -> c
+            semAcentos = semAcentos.Replace('ç', 'c').Replace('Ç', 'C');
+
+            // Maiúsculas
+            semAcentos = semAcentos.ToUpperInvariant();
+
+            // Remove lixo invisível mas mantém ' e -
+            semAcentos = Regex.Replace(semAcentos, @"[^A-Z0-9' \-]", "");
+
+            return semAcentos;
+        }
+
+        public static bool EqualsNormalized(string a, string b)
+            => Normalize(a) == Normalize(b);
+
+
+        // ============================================================
+        // R E S O L V E   C L I E N T E ,   C I D A D E ,   E S T A D O
+        // ============================================================
         public async Task<(Cliente cliente, Cidade cidade, Estado estado, Unidade unidade)> ResolverAsync(
             string nomeCliente,
             string nomeDestinatario,
@@ -21,9 +63,13 @@ namespace dago.Services.Utils
             string ufEntrega,
             string unidadeReceptora)
         {
-            // 🔸 Estado
-            var estado = await _db.Estados
-                .FirstOrDefaultAsync(e => e.Sigla.ToUpper() == ufEntrega.ToUpper());
+            // ------------------------------------------------------------
+            // ESTADO (por sigla normalizada)
+            // ------------------------------------------------------------
+            string ufNorm = Normalize(ufEntrega);
+
+            var estados = await _db.Estados.ToListAsync();
+            var estado = estados.FirstOrDefault(e => Normalize(e.Sigla) == ufNorm);
 
             if (estado == null)
             {
@@ -38,11 +84,16 @@ namespace dago.Services.Utils
                 await _db.SaveChangesAsync();
             }
 
-            // 🔸 Cidade
-            var cidade = await _db.Cidades
-                .FirstOrDefaultAsync(c =>
-                    c.Nome.ToUpper() == cidadeEntrega.ToUpper() &&
-                    c.EstadoId == estado.Id);
+
+            // ------------------------------------------------------------
+            // CIDADE (por nome + estado, normalizado)
+            // ------------------------------------------------------------
+            var cidadesDoEstado = await _db.Cidades
+                .Where(c => c.EstadoId == estado.Id)
+                .ToListAsync();
+
+            var cidade = cidadesDoEstado
+                .FirstOrDefault(c => EqualsNormalized(c.Nome, cidadeEntrega));
 
             if (cidade == null)
             {
@@ -56,9 +107,14 @@ namespace dago.Services.Utils
                 await _db.SaveChangesAsync();
             }
 
-            // 🔸 Unidade
-            var unidade = await _db.Unidades
-                .FirstOrDefaultAsync(u => u.Nome.ToUpper() == unidadeReceptora.ToUpper());
+
+            // ------------------------------------------------------------
+            // UNIDADE (normalizada)
+            // ------------------------------------------------------------
+            var unidades = await _db.Unidades.ToListAsync();
+
+            var unidade = unidades
+                .FirstOrDefault(u => EqualsNormalized(u.Nome, unidadeReceptora));
 
             if (unidade == null)
             {
@@ -71,22 +127,26 @@ namespace dago.Services.Utils
                 await _db.SaveChangesAsync();
             }
 
-            // 🔸 Cliente remetente
-            var cliente = await _db.Clientes
-                .FirstOrDefaultAsync(c => c.Nome.ToUpper() == nomeCliente.ToUpper());
+
+            // ------------------------------------------------------------
+            // CLIENTE REMETENTE (normalizado)
+            // ------------------------------------------------------------
+            var clientes = await _db.Clientes.ToListAsync();
+
+            var cliente = clientes
+                .FirstOrDefault(c => EqualsNormalized(c.Nome, nomeCliente));
 
             if (cliente == null)
             {
                 cliente = new Cliente
                 {
                     Nome = nomeCliente.ToUpper(),
-                    Cnpj = Guid.NewGuid().ToString() // placeholder
+                    Cnpj = Guid.NewGuid().ToString()
                 };
                 _db.Clientes.Add(cliente);
                 await _db.SaveChangesAsync();
             }
 
-            // 🔹 Tudo pronto
             return (cliente, cidade, estado, unidade);
         }
     }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using dago.Data;
@@ -11,9 +12,11 @@ using dago.Data;
 namespace dago.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251113145117_CorrecaoLeadTime")]
+    partial class CorrecaoLeadTime
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -320,7 +323,13 @@ namespace dago.Migrations
                     b.Property<int>("CidadeId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("CidadeId1")
+                        .HasColumnType("integer");
+
                     b.Property<int>("ClienteId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ClienteId1")
                         .HasColumnType("integer");
 
                     b.Property<int>("DiasLead")
@@ -329,13 +338,22 @@ namespace dago.Migrations
                     b.Property<int>("EstadoId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("EstadoId1")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CidadeId");
 
+                    b.HasIndex("CidadeId1");
+
                     b.HasIndex("ClienteId");
 
+                    b.HasIndex("ClienteId1");
+
                     b.HasIndex("EstadoId");
+
+                    b.HasIndex("EstadoId1");
 
                     b.ToTable("LeadTimesCliente");
                 });
@@ -734,22 +752,34 @@ namespace dago.Migrations
             modelBuilder.Entity("dago.Models.LeadTimeCliente", b =>
                 {
                     b.HasOne("dago.Models.Cidade", "Cidade")
-                        .WithMany("LeadTimesCliente")
+                        .WithMany()
                         .HasForeignKey("CidadeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("dago.Models.Cliente", "Cliente")
+                    b.HasOne("dago.Models.Cidade", null)
                         .WithMany("LeadTimesCliente")
+                        .HasForeignKey("CidadeId1");
+
+                    b.HasOne("dago.Models.Cliente", "Cliente")
+                        .WithMany()
                         .HasForeignKey("ClienteId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("dago.Models.Estado", "Estado")
+                    b.HasOne("dago.Models.Cliente", null)
                         .WithMany("LeadTimesCliente")
+                        .HasForeignKey("ClienteId1");
+
+                    b.HasOne("dago.Models.Estado", "Estado")
+                        .WithMany()
                         .HasForeignKey("EstadoId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("dago.Models.Estado", null)
+                        .WithMany("LeadTimesCliente")
+                        .HasForeignKey("EstadoId1");
 
                     b.Navigation("Cidade");
 

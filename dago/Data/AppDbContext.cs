@@ -154,11 +154,25 @@ namespace dago.Data
                 .HasForeignKey(e => e.RegiaoEstadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // LeadTimeCliente → RegiaoEstado
+
+            // LEAD TIME CLIENTE — Relacionamento correto
+
             modelBuilder.Entity<LeadTimeCliente>()
-                .HasOne(l => l.RegiaoEstado)
-                .WithMany()
-                .HasForeignKey(l => l.RegiaoEstadoId)
+                .HasOne(l => l.Cliente)
+                .WithMany(c => c.LeadTimesCliente)
+                .HasForeignKey(l => l.ClienteId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<LeadTimeCliente>()
+                .HasOne(l => l.Cidade)
+                .WithMany(c => c.LeadTimesCliente)
+                .HasForeignKey(l => l.CidadeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<LeadTimeCliente>()
+                .HasOne(l => l.Estado)
+                .WithMany(e => e.LeadTimesCliente)
+                .HasForeignKey(l => l.EstadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // =======================================

@@ -16,6 +16,7 @@ namespace dago.Models
         public int? UsuarioId { get; set; }
 
        public Usuario? Usuario { get; set; }
+        public ICollection<LeadTimeCliente> LeadTimesCliente { get; set; } = new List<LeadTimeCliente>();
         public ICollection<Ctrc> Ctrcs { get; set; } = new List<Ctrc>();
     }
 }

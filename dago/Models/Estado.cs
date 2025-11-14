@@ -23,6 +23,8 @@ namespace dago.Models
         public RegiaoEstado RegiaoEstado { get; set; } = null!;
 
         // Relacionamentos
+
+        public ICollection<LeadTimeCliente> LeadTimesCliente { get; set; } = new List<LeadTimeCliente>();
         public ICollection<Cidade> Cidades { get; set; } = new List<Cidade>();
         public ICollection<Unidade> Unidades { get; set; } = new List<Unidade>();
         public ICollection<Ctrc> Ctrcs { get; set; } = new List<Ctrc>();

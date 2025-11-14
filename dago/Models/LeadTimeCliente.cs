@@ -8,21 +8,25 @@ namespace dago.Models
         [Key]
         public int Id { get; set; }
 
+        // Cliente
         [Required]
         [ForeignKey(nameof(Cliente))]
         public int ClienteId { get; set; }
-
         public Cliente Cliente { get; set; } = null!;
 
+        // Cidade
         [Required]
-        [ForeignKey(nameof(TipoRegiao))]
-        public int TipoRegiaoId { get; set; }
+        [ForeignKey(nameof(Cidade))]
+        public int CidadeId { get; set; }
+        public Cidade Cidade { get; set; } = null!;
 
-        public TipoRegiao TipoRegiao { get; set; } = null!;
-        [ForeignKey(nameof(RegiaoEstado))]
-        public int RegiaoEstadoId { get; set; }
-        public RegiaoEstado RegiaoEstado { get; set; } = null!;
+        // Estado (redundância útil para query mais rápida)
+        [Required]
+        [ForeignKey(nameof(Estado))]
+        public int EstadoId { get; set; }
+        public Estado Estado { get; set; } = null!;
 
+        // Dias de lead time
         [Required]
         public int DiasLead { get; set; }
     }

@@ -83,28 +83,42 @@ namespace dago.Services.Utils
 
         private async Task<int> CalcularLeadTimeDiasAsync(int clienteId, int cidadeId, int estadoId)
         {
-            // Busca tipo e região da cidade
-            var cidade = await _db.Cidades.AsNoTracking().FirstOrDefaultAsync(c => c.Id == cidadeId);
-            if (cidade == null) return 0;
-
-            var lead = await _db.LeadTimesCliente
+            // 1️⃣ LeadTime específico do cliente para a combinação Cidade + Estado
+            var leadCliente = await _db.LeadTimesCliente
+                .AsNoTracking()
                 .FirstOrDefaultAsync(l =>
                     l.ClienteId == clienteId &&
-                    l.TipoRegiaoId == cidade.TipoRegiaoId &&
-                    l.RegiaoEstadoId == cidade.Estado.RegiaoEstadoId);
+                    l.CidadeId == cidadeId &&
+                    l.EstadoId == estadoId);
 
-            if (lead == null)
+            if (leadCliente != null)
+                return leadCliente.DiasLead;
+
+            // 2️⃣ LeadTime do cliente "Esporádico" (ID 3573)
+            var leadEsporadico = await _db.LeadTimesCliente
+                .AsNoTracking()
+                .FirstOrDefaultAsync(l =>
+                    l.ClienteId == 3573 &&
+                    l.CidadeId == cidadeId &&
+                    l.EstadoId == estadoId);
+
+            if (leadEsporadico != null)
             {
-                // Usa o cliente "Esporádico" (ID = 3573)
-                lead = await _db.LeadTimesCliente
-                    .FirstOrDefaultAsync(l =>
-                        l.ClienteId == 3573 &&
-                        l.TipoRegiaoId == cidade.TipoRegiaoId &&
-                        l.RegiaoEstadoId == cidade.Estado.RegiaoEstadoId);
+                Console.WriteLine(
+                    $"ℹ️ Cliente {clienteId} sem lead próprio — usando LeadTime do Esporádico ({leadEsporadico.DiasLead} dias)."
+                );
+                return leadEsporadico.DiasLead;
             }
 
-            return lead?.DiasLead ?? 0;
+            // 3️⃣ Nenhum lead time configurado
+            Console.WriteLine(
+                $"⚠️ Nenhum LeadTime encontrado para Cliente {clienteId}, Cidade {cidadeId}, Estado {estadoId}, nem para Esporádico."
+            );
+
+            return 0;
         }
+
+
 
         private int DefinirStatusEntrega(DateTime? dataEntrega, DateTime? dataEmissao, int leadTimeDias, int? desvioPrazoDias)
         {

@@ -23,6 +23,8 @@ namespace dago.Models
         public int TipoRegiaoId { get; set; }
 
         public TipoRegiao TipoRegiao { get; set; } = null!;
+        public ICollection<LeadTimeCliente> LeadTimesCliente { get; set; } = new List<LeadTimeCliente>();
+
         public ICollection<Ctrc> Ctrcs { get; set; } = new List<Ctrc>();
     }
 }
