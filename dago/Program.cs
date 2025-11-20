@@ -64,6 +64,7 @@ builder.Services.AddScoped<UnidadeRepository>();
 builder.Services.AddScoped<IConfiguracaoEsporadicoService, ConfiguracaoEsporadicoService>();
 builder.Services.AddScoped<IConfiguracaoEsporadicoRepository, ConfiguracaoEsporadicoRepository>();
 builder.Services.AddScoped<AgendaService>();
+builder.Services.AddScoped<CtrcNormalizer>();
 
 
 
@@ -96,6 +97,10 @@ app.UseAuthorization();
 app.MapControllers();
 //await DateValidationTest.RunAsync(app.Services);
 //await dago.Tests.CtrcImportTest.RunAsync(app.Services);
+//await CtrcCustomTestRunner.RunAsync(app.Services);
+//await dago.Tests.TesteNormalizerCnpj.RunAsync(app.Services);
+
+
 
 app.Run();
 

@@ -75,6 +75,10 @@ namespace dago.Services
                             Unidade = c.Unidade.Nome,
                             Destinatario = c.Destinatario,
                             NumeroNotaFiscal = c.NumeroNotaFiscal ?? string.Empty,
+                            UltimaDescricaoOcorrenciaAtendimento = c.OcorrenciasAtendimento
+                                .OrderByDescending(o => o.Data)
+                                .Select(o => o.Descricao)
+                                .FirstOrDefault(),
                             UltimaOcorrenciaSistema = c.OcorrenciasSistema
                                 .OrderByDescending(o => o.Data)
                                 .Select(o => o.Descricao)
@@ -168,6 +172,11 @@ namespace dago.Services
                   Unidade = c.Unidade.Nome,
                   Destinatario = c.Destinatario,
                   NumeroNotaFiscal = c.NumeroNotaFiscal ?? string.Empty,
+                  UltimaDescricaoOcorrenciaAtendimento = c.OcorrenciasAtendimento
+                        .OrderByDescending(o => o.Data)
+                        .Select(o => o.Descricao)
+                        .FirstOrDefault(),
+
                   UltimaOcorrenciaSistema = c.OcorrenciasSistema
                       .OrderByDescending(o => o.Data)
                       .Select(o => o.Descricao)
@@ -276,7 +285,9 @@ namespace dago.Services
                     CtrcId = ctrc.Id,
                     Data = DateTime.Today,
                     Descricao = dto.DescricaoOcorrenciaAtendimento,
-                    ReplicaClientes = false
+                    ReplicaClientes = false,
+                    TipoOcorrenciaId = dto.TipoOcorrenciaId
+
                 };
                 await _db.OcorrenciasAtendimento.AddAsync(ocorr);
             }

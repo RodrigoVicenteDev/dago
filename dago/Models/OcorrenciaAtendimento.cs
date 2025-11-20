@@ -15,8 +15,8 @@ namespace dago.Models
 
         [Required]
         [ForeignKey(nameof(TipoOcorrencia))]
-        public int TipoOcorrenciaId { get; set; }
-        public TipoOcorrencia TipoOcorrencia { get; set; } = null!;
+        public int? TipoOcorrenciaId { get; set; }
+        public TipoOcorrencia? TipoOcorrencia { get; set; } = null!;
 
         [Required]
         public DateTime Data { get; set; }

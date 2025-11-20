@@ -16,6 +16,7 @@ namespace dago.CsvMaps
                 .TypeConverterOption.CultureInfo(new CultureInfo("pt-BR"));
             Map(m => m.PracaExpedidora).Name("Praca Expedidora");
             Map(m => m.ClienteRemetente).Name("Cliente Remetente");
+            Map(m => m.CnpjRemetente).Name("CNPJ Remetente");
             Map(m => m.ClienteDestinatario).Name("Cliente Destinatario");
             Map(m => m.CidadeEntrega).Name("Cidade de Entrega");
             Map(m => m.UfEntrega).Name("UF de Entrega");

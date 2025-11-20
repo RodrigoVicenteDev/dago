@@ -22,13 +22,13 @@ namespace dago.Services.Utils
         {
             string clienteNome = item.clienteRemetente;
             string destinatarioNome = item.clienteDestinatario;
+            string cnpjRemetente = item.cnpjRemetente;
             string cidadeEntrega = item.cidadeEntrega;
             string ufEntrega = item.ufEntrega;
             string unidadeReceptora = item.unidadeReceptora;
 
             var (cliente, cidade, estado, unidade) = await _normalizer.ResolverAsync(
-                clienteNome, destinatarioNome, cidadeEntrega, ufEntrega, unidadeReceptora
-            );
+                clienteNome, cnpjRemetente, destinatarioNome, cidadeEntrega, ufEntrega, unidadeReceptora);
 
             DateTime? dataEmissao = ParseDate(item.dataEmissao);
             DateTime? dataEntrega = ParseDate(item.dataEntregaRealizada);

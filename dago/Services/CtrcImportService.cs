@@ -66,6 +66,7 @@ namespace dago.Services
                     {
                         ctrc = row.SerieNumeroCtrc,
                         clienteRemetente = row.ClienteRemetente,
+                        cnpjRemetente = row.CnpjRemetente,
                         clienteDestinatario = row.ClienteDestinatario,
                         cidadeEntrega = row.CidadeEntrega,
                         ufEntrega = row.UfEntrega,
@@ -75,7 +76,8 @@ namespace dago.Services
                         dataEntregaRealizada = entrega?.ToString("dd/MM/yyyy"),
                         dataUltimaOcorrencia = ocorrencia?.ToString("dd/MM/yyyy"),
                         descricaoUltimaOcorrencia = row.DescricaoUltimaOcorrencia,
-                        pesoToneladas = pesoTon
+                        pesoToneladas = pesoTon,
+                        notasFiscais = row.NotasFiscais
                     });
                 }
                 catch { /* ignora linha inválida na prévia */ }
@@ -111,11 +113,12 @@ namespace dago.Services
                     var normalizer = new CtrcNormalizer(_db);
                     var (cliente, cidade, estado, unidade) = await normalizer.ResolverAsync(
                         (string)item.clienteRemetente,
+                        (string)item.cnpjRemetente,   // <-- NOVO
                         (string)item.clienteDestinatario,
                         (string)item.cidadeEntrega,
                         (string)item.ufEntrega,
                         (string)item.unidadeReceptora
-                    );
+);
 
                     DateTime? dataEmissao = ParseDate(item.dataEmissao);
                     DateTime? dataEntrega = ParseDate(item.dataEntregaRealizada);
@@ -169,10 +172,21 @@ namespace dago.Services
                     }
 
                     await _db.SaveChangesAsync();
+
+                    await RegistrarOcorrenciaSistemaAsync(ctrc.Id, dataOcorrencia, (string?)item.descricaoUltimaOcorrencia);
+                    await _db.SaveChangesAsync();
+
                     gravados++;
                 }
+                
                 catch (Exception ex)
                 {
+                    Console.WriteLine("❌ ERRO NA IMPORTAÇÃO DO CTRC");
+                    Console.WriteLine($"   ➤ Linha: {linhaNum}");
+                    Console.WriteLine($"   ➤ Conteúdo: {System.Text.Json.JsonSerializer.Serialize(item)}");
+                    Console.WriteLine($"   ➤ Erro: {ex.Message}");
+                    Console.WriteLine($"   ➤ StackTrace: {ex.StackTrace}");
+
                     erros.Add(new LinhaErroImportacaoDTO
                     {
                         Linha = linhaNum,
@@ -320,6 +334,36 @@ namespace dago.Services
             return 0;
         }
 
+
+        private async Task RegistrarOcorrenciaSistemaAsync(int ctrcId, DateTime? data, string? descricao)
+        {
+            if (!data.HasValue || string.IsNullOrWhiteSpace(descricao))
+                return;
+
+            var existe = await _db.OcorrenciasSistema
+                .AsNoTracking()
+                .AnyAsync(o => o.CtrcId == ctrcId && o.Data == data && o.Descricao == descricao);
+            if (existe) return;
+
+            var ultima = await _db.OcorrenciasSistema
+                .Where(o => o.CtrcId == ctrcId)
+                .OrderByDescending(o => o.Data)
+                .FirstOrDefaultAsync();
+
+            int numeroOcorrencia = (ultima?.NumeroOcorrencia ?? 0) + 1;
+            int? diasDesdeAnterior = ultima != null ? (data.Value.Date - ultima.Data.Date).Days : (int?)null;
+
+            var nova = new OcorrenciaSistema
+            {
+                CtrcId = ctrcId,
+                NumeroOcorrencia = numeroOcorrencia,
+                Data = data.Value,
+                Descricao = descricao,
+                DiasDesdeAnterior = diasDesdeAnterior
+            };
+
+            await _db.OcorrenciasSistema.AddAsync(nova);
+        }
 
     }
 }

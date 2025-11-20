@@ -6,4 +6,5 @@
 
     // Texto livre da ocorrência de atendimento
     public string? DescricaoOcorrenciaAtendimento { get; set; }
+    public int? TipoOcorrenciaId { get; set; } 
 }

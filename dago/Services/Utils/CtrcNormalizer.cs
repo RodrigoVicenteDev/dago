@@ -58,10 +58,12 @@ namespace dago.Services.Utils
         // ============================================================
         public async Task<(Cliente cliente, Cidade cidade, Estado estado, Unidade unidade)> ResolverAsync(
             string nomeCliente,
+            string cnpjCliente,
             string nomeDestinatario,
             string cidadeEntrega,
             string ufEntrega,
-            string unidadeReceptora)
+            string unidadeReceptora
+)
         {
             // ------------------------------------------------------------
             // ESTADO (por sigla normalizada)
@@ -133,20 +135,25 @@ namespace dago.Services.Utils
             // ------------------------------------------------------------
             var clientes = await _db.Clientes.ToListAsync();
 
-            var cliente = clientes
-                .FirstOrDefault(c => EqualsNormalized(c.Nome, nomeCliente));
+            // remove tudo que não for número
+            string cnpjNormalizado = Regex.Replace(cnpjCliente ?? "", @"\D", "");
 
+            // busca pelo CNPJ normalizado
+            var cliente = clientes.FirstOrDefault(c =>
+                Regex.Replace(c.Cnpj ?? "", @"\D", "") == cnpjNormalizado
+            );
+
+            // se não achou, cria
             if (cliente == null)
             {
                 cliente = new Cliente
                 {
                     Nome = nomeCliente.ToUpper(),
-                    Cnpj = Guid.NewGuid().ToString()
+                    Cnpj = cnpjNormalizado
                 };
                 _db.Clientes.Add(cliente);
                 await _db.SaveChangesAsync();
             }
-
             return (cliente, cidade, estado, unidade);
         }
     }
