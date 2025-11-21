@@ -18,7 +18,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: MyAllowSpecificOrigins,
         policy =>
         {
-            policy.WithOrigins("http://localhost:5173") // endereço do Vite
+            policy.WithOrigins("http://localhost:5173", "http://localhost:3000") // endereço do Vite
                   .AllowAnyHeader()
                   .AllowAnyMethod();
         });
@@ -84,11 +84,12 @@ var app = builder.Build();
 app.UseCors("_myAllowSpecificOrigins");
 app.UseAuthentication();
 app.UseAuthorization();
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Dago API v1");
+});
+
 
 app.UseHttpsRedirection();
 

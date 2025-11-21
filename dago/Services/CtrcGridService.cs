@@ -20,7 +20,7 @@ namespace dago.Services
         public async Task<List<CtrcGridDTO>> ListarAsync(int usuarioId, string cargo, DateTime? dataInicio, DateTime? dataFim)
         {
             var fim = dataFim?.Date ?? DateTime.Today;
-            var inicio = dataInicio?.Date ?? fim.AddDays(-30);
+            var inicio = dataInicio?.Date ?? fim.AddDays(-60);
 
             if ((fim - inicio).TotalDays > 60)
                 throw new InvalidOperationException("O período máximo permitido é de 60 dias.");
