@@ -82,6 +82,9 @@ builder.Services.AddScoped<IConfiguracaoEsporadicoService, ConfiguracaoEsporadic
 builder.Services.AddScoped<IConfiguracaoEsporadicoRepository, ConfiguracaoEsporadicoRepository>();
 builder.Services.AddScoped<AgendaService>();
 builder.Services.AddScoped<CtrcNormalizer>();
+builder.Services.AddScoped<PainelAvisosRepository>();
+builder.Services.AddScoped<PainelAvisosService>();
+
 
 
 

@@ -17,6 +17,9 @@ namespace dago.Services
         /// <param name="dataInicio">Data inicial do filtro.</param>
         /// <param name="dataFim">Data final do filtro.</param>
         /// <returns>Lista de CTRCs resumidos para exibição no grid.</returns>
+        /// 
+        Task<List<CtrcGridDTO>> GetGridByCtrcs(List<string> ctrcs);
+
         Task<List<CtrcGridDTO>> ListarAsync(
             int usuarioId,
             string cargo,

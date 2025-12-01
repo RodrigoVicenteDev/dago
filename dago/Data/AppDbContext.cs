@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
-using dago.Models;
+﻿using dago.Models;
+using dago.Models.DTOs.Views;
+using Microsoft.EntityFrameworkCore;
 
 namespace dago.Data
 {
@@ -29,6 +30,20 @@ namespace dago.Data
         public DbSet<ConfiguracaoEsporadicoCliente> ConfiguracaoEsporadicoClientes { get; set; }
         public DbSet<ConfiguracaoEsporadicoUnidade> ConfiguracaoEsporadicoUnidades { get; set; }
         public DbSet<ConfiguracaoEsporadicoDestinatario> ConfiguracaoEsporadicoDestinatarios { get; set; }
+
+        // =====================================================
+        //  -----------------Views-----------------------------
+        // =====================================================
+
+        public DbSet<CtrcsParadosGruDTO> CtrcsParadosGru { get; set; }
+        public DbSet<CtrcsParadosUndDTO> CtrcsParadosUnd { get; set; }
+        public DbSet<CtrcsAtrasadaDTO> CtrcsAtrasada { get; set; }
+        public DbSet<CtrcsVaiAtrasarDTO> CtrcsVaiAtrasar { get; set; }
+
+       
+           
+     
+
 
         // =====================================================
         // 🔹 Normaliza datas antes de salvar (sem hora / sem UTC)
@@ -196,6 +211,16 @@ namespace dago.Data
                     .WithOne(d => d.ConfiguracaoEsporadico)
                     .HasForeignKey(d => d.ConfiguracaoEsporadicoId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                // =======================================
+                // VIEWS
+                // =======================================
+
+                modelBuilder.Entity<CtrcsParadosGruDTO>().HasNoKey().ToView("ctrcs_parados_gru");
+                modelBuilder.Entity<CtrcsParadosUndDTO>().HasNoKey().ToView("ctrcs_parados_und");
+                modelBuilder.Entity<CtrcsAtrasadaDTO>().HasNoKey().ToView("ctrs_atrasada");
+                modelBuilder.Entity<CtrcsVaiAtrasarDTO>().HasNoKey().ToView("ctrs_vai_atrasar");
+
             });
 
             // 🔹 Aqui está o ponto crucial:

@@ -73,6 +73,17 @@ namespace dago.Controllers
             return Ok(lookups);
         }
 
+        [HttpPost("grid-por-lista")]
+        public async Task<IActionResult> GridPorLista([FromBody] List<string> ctrcs)
+        {
+            if (ctrcs == null || ctrcs.Count == 0)
+                return BadRequest("Lista de CTRCs vazia.");
+
+            var lista = await _gridService.GetGridByCtrcs(ctrcs);
+
+            return Ok(lista);
+        }
+
         /// <summary>
         /// Atualiza campos editáveis do CTRC (data de entrega, status,
         /// observação e ocorrência de atendimento).

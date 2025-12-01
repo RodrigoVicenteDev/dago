@@ -13,6 +13,105 @@ namespace dago.Services
         {
             _db = db;
         }
+        public async Task<List<CtrcGridDTO>> GetGridByCtrcs(List<string> ctrcs)
+        {
+            // 🔹 Sanitiza entrada
+            ctrcs = ctrcs
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .ToList();
+
+            if (ctrcs.Count == 0)
+                return new List<CtrcGridDTO>();
+
+            // 🔹 Query base (igual à do grid principal, exceto período)
+            var lista = await _db.Ctrcs
+                .Include(c => c.Cliente)
+                .Include(c => c.CidadeDestino).ThenInclude(ci => ci.Estado)
+                .Include(c => c.Unidade)
+                .Include(c => c.StatusEntrega)
+                .Include(c => c.OcorrenciasSistema)
+                .Include(c => c.OcorrenciasAtendimento)
+                .Include(c => c.Agendas)
+                .Where(c => ctrcs.Contains(c.Numero))
+                .AsNoTracking()
+                .Select(c => new CtrcGridDTO
+                {
+                    Id = c.Id,
+                    Ctrc = c.Numero,
+                    DataEmissao = c.DataEmissao,
+
+                    Cliente = c.Cliente.Nome,
+                    Destinatario = c.Destinatario,
+                    CidadeEntrega = c.CidadeDestino.Nome,
+                    Uf = c.CidadeDestino.Estado.Sigla,
+                    Unidade = c.Unidade.Nome,
+                    NumeroNotaFiscal = c.NumeroNotaFiscal,
+
+                    UltimaOcorrenciaSistema = c.OcorrenciasSistema
+                        .OrderByDescending(o => o.Data)
+                        .Select(o => o.Descricao)
+                        .FirstOrDefault(),
+
+                    UltimaDescricaoOcorrenciaAtendimento = c.OcorrenciasAtendimento
+                        .OrderByDescending(o => o.Data)
+                        .Select(o => o.Descricao)
+                        .FirstOrDefault(),
+
+                    DataPrevistaEntrega = c.DataPrevistaEntrega,
+                    DataEntregaRealizada = c.DataEntregaRealizada,
+
+                    Peso = c.Peso,
+                    StatusEntregaId = c.StatusEntregaId,
+                    StatusEntregaNome = c.StatusEntrega.Nome,
+
+                    NotasFiscais = c.NotasFiscais,
+                    Observacao = c.Observacao,
+
+                    DataAgenda = c.Agendas
+                        .OrderByDescending(a => a.Data)
+                        .Select(a => (DateTime?)a.Data)
+                        .FirstOrDefault(),
+
+                    DesvioPrazoDias = c.DesvioPrazoDias, // será recalculado abaixo
+                })
+                .ToListAsync();
+
+            // 🔹 Pós-processamento — Agora .Date pode ser usado
+            foreach (var dto in lista)
+            {
+                dto.DataEmissao = dto.DataEmissao.Date;
+
+                if (dto.DataPrevistaEntrega.HasValue)
+                    dto.DataPrevistaEntrega = dto.DataPrevistaEntrega.Value.Date;
+
+                if (dto.DataEntregaRealizada.HasValue)
+                    dto.DataEntregaRealizada = dto.DataEntregaRealizada.Value.Date;
+
+                if (dto.DataAgenda.HasValue)
+                    dto.DataAgenda = dto.DataAgenda.Value.Date;
+
+                // Recalcula desvio oficial
+                if (!dto.DataEntregaRealizada.HasValue)
+                {
+                    dto.DesvioPrazoDias = null;
+                    continue;
+                }
+
+                var entrega = dto.DataEntregaRealizada.Value.Date;
+
+                var basePrazo =
+                dto.DataAgenda
+                ?? dto.DataPrevistaEntrega
+                ?? dto.DataEmissao;
+
+                dto.DesvioPrazoDias = (entrega - basePrazo).Days;
+
+            }
+
+            return lista;
+        }
+
 
         // =============================
         // LISTAGEM PRINCIPAL PARA O GRID
